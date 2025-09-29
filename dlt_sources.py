@@ -1,41 +1,77 @@
 import dlt
 from dlt.sources.rest_api import RESTAPIConfig, rest_api_resources
 
-API_BASE_URL = "https://gw.havochvatten.se//external-public/bathing-waters/v2"
+API_BASE_URL = "https://gw.havochvatten.se//external-public/bathing-waters/v2/"
+
+ROW_COUNT_LIMIT = 25
 
 
-@dlt.source
+class RowCountFilter:
+    def __init__(self, max_rows=None):
+        self.count = 0
+        self.max_rows = max_rows
+
+    def __call__(self, record):
+        if self.max_rows and self.count >= self.max_rows:
+            return False
+        self.count += 1
+        return True
+
+
+def flatten_id(record):
+    return record | {"id": record.get("bathingWater", {}).get("id")}
+
+
+@dlt.source(name="bathing_waters")
 def bathing_waters():
     config: RESTAPIConfig = {
         "client": {
             "base_url": API_BASE_URL,
             "paginator": "single_page",
         },
+        "resource_defaults": {
+            "write_disposition": "replace",
+            "max_table_nesting": 5,
+            "parallelized": True,
+        },
         "resources": [
             {
                 "name": "waters",
-                "endpoint": {
-                    "path": "bathing-waters/",
-                },
+                "selected": False,
+                "endpoint": {"path": "bathing-waters/"},
+                "processing_steps": [
+                    {"filter": RowCountFilter(max_rows=ROW_COUNT_LIMIT)},
+                    {"map": flatten_id},
+                ],
+                "write_disposition": "skip",
             },
             {
-                "name": "profile",
+                "name": "profiles",
+                "selected": True,
                 "endpoint": {
-                    "path": "bathing-waters/{resources.waters.bathingWater.id}/",
+                    "path": "bathing-waters/{resources.waters.id}/profiles/",
+                    "data_selector": "$",
                 },
+                "include_from_parent": ["id"],
             },
             {
                 "name": "results",
+                "selected": True,
                 "endpoint": {
-                    "path": "bathing-waters/{resources.waters.bathingWater.id}/results/",
+                    "path": "bathing-waters/{resources.waters.id}/results/",
+                    "data_selector": "$.results",
                 },
+                "include_from_parent": ["id"],
             },
             {
                 "name": "forecasts",
+                "selected": True,
                 "endpoint": {
                     "path": "forecasts/",
-                    "params": {"bathingWaterId": "{resources.waters.bathingWater.id}"},
+                    "params": {"bathingWaterId": "{resources.waters.id}"},
+                    "data_selector": "$.forecasts",
                 },
+                "include_from_parent": ["id"],
             },
         ],
     }
@@ -45,7 +81,9 @@ def bathing_waters():
 
 def main():
     pipeline = dlt.pipeline(
+        pipeline_name="bathing_waters_pipeline",
         destination=dlt.destinations.duckdb(),
+        dataset_name="raw",  # schema
         progress="log",
     )
 
