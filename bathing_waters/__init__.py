@@ -1,9 +1,10 @@
 import dlt
 from dlt.sources.rest_api import RESTAPIConfig, rest_api_resources
 
-API_BASE_URL = "https://gw.havochvatten.se//external-public/bathing-waters/v2/"
+DB_NAME = "bathing_waters"
+DB_SCHEMA = "raw"
 
-ROW_COUNT_LIMIT = 25
+ROW_COUNT_LIMIT = 100
 
 
 class RowCountFilter:
@@ -26,7 +27,7 @@ def flatten_id(record):
 def bathing_waters():
     config: RESTAPIConfig = {
         "client": {
-            "base_url": API_BASE_URL,
+            "base_url": "https://gw.havochvatten.se//external-public/bathing-waters/v2/",
             "paginator": "single_page",
         },
         "resource_defaults": {
@@ -81,9 +82,9 @@ def bathing_waters():
 
 def main():
     pipeline = dlt.pipeline(
-        pipeline_name="bathing_waters_pipeline",
+        pipeline_name=DB_NAME,  # database
         destination=dlt.destinations.duckdb(),
-        dataset_name="raw",  # schema
+        dataset_name=DB_SCHEMA,  # schema
         progress="log",
     )
 
