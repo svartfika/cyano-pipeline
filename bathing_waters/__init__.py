@@ -1,58 +1,9 @@
-import logging
 import dlt
-from dlt.sources.helpers import requests
 from dlt.sources.rest_api import RESTAPIConfig, rest_api_resources
-from requests_ratelimiter import LimiterAdapter
-from urllib3.util.retry import Retry
 
-DB_NAME = "bathing_waters"
-DB_SCHEMA = "raw"
+from .utils import RowCountFilter, build_throttled_session
 
-ROW_COUNT_LIMIT = 100
-
-
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger("urllib3")
-logger.setLevel(logging.INFO)
-
-
-class RowCountFilter:
-    def __init__(self, max_rows=None):
-        self.count = 0
-        self.max_rows = max_rows
-
-    def __call__(self, record):
-        if self.max_rows and self.count >= self.max_rows:
-            return False
-        self.count += 1
-        return True
-
-
-def build_throttled_session():
-    session = requests.Session(raise_for_status=False)
-
-    retry_strategy = Retry(
-        total=5,
-        backoff_factor=0.5,
-        status_forcelist=[408, 429, 500, 502, 503, 504],
-        allowed_methods=["GET", "HEAD", "OPTIONS", "POST"],
-        connect=3,
-        read=3,
-        status=3,
-        raise_on_status=False,
-    )
-
-    adapter = LimiterAdapter(
-        per_minute=1000,
-        max_retries=retry_strategy,
-        per_host=True,
-        limit_statuses=(429,),
-    )
-
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
-
-    return session
+ROW_COUNT_LIMIT = None
 
 
 def flatten_id(record):
@@ -63,7 +14,7 @@ def flatten_id(record):
 def bathing_waters_source():
     config: RESTAPIConfig = {
         "client": {
-            "base_url": "https://gw.havochvatten.se//external-public/bathing-waters/v2/",
+            "base_url": "https://gw.havochvatten.se/external-public/bathing-waters/v2/",
             "paginator": "single_page",
             "session": build_throttled_session(),
         },
@@ -94,7 +45,7 @@ def bathing_waters_source():
             },
             {
                 "name": "results",
-                "selected": False,
+                "selected": True,
                 "endpoint": {
                     "path": "bathing-waters/{resources.waters.id}/results/",
                     "data_selector": "$.results",
@@ -103,7 +54,7 @@ def bathing_waters_source():
             },
             {
                 "name": "forecasts",
-                "selected": False,
+                "selected": True,
                 "endpoint": {
                     "path": "forecasts/",
                     "params": {"bathingWaterId": "{resources.waters.id}"},
@@ -114,19 +65,4 @@ def bathing_waters_source():
         ],
     }
 
-    yield from rest_api_resources(config)
-
-
-def main():
-    pipeline = dlt.pipeline(
-        pipeline_name=DB_NAME,  # database
-        destination=dlt.destinations.duckdb(),
-        dataset_name=DB_SCHEMA,  # schema
-        progress="log",
-    )
-
-    pipeline.run(bathing_waters_source())
-
-
-if __name__ == "__main__":
-    main()
+    yield from rest_api_resources(RESTAPIConfig(**config))
