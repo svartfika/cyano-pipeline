@@ -1,5 +1,10 @@
+from config import BathingWatersApi
+
+
 def main():
-    print("Hello from bw-local-dev!")
+    api_config = BathingWatersApi()
+
+    print(api_config.health())
 
 
 if __name__ == "__main__":
