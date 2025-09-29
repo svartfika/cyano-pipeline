@@ -1,10 +1,19 @@
+import logging
 import dlt
+from dlt.sources.helpers import requests
 from dlt.sources.rest_api import RESTAPIConfig, rest_api_resources
+from requests_ratelimiter import LimiterAdapter
+from urllib3.util.retry import Retry
 
 DB_NAME = "bathing_waters"
 DB_SCHEMA = "raw"
 
 ROW_COUNT_LIMIT = 100
+
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger("urllib3")
+logger.setLevel(logging.INFO)
 
 
 class RowCountFilter:
@@ -19,16 +28,44 @@ class RowCountFilter:
         return True
 
 
+def build_throttled_session():
+    session = requests.Session(raise_for_status=False)
+
+    retry_strategy = Retry(
+        total=5,
+        backoff_factor=0.5,
+        status_forcelist=[408, 429, 500, 502, 503, 504],
+        allowed_methods=["GET", "HEAD", "OPTIONS", "POST"],
+        connect=3,
+        read=3,
+        status=3,
+        raise_on_status=False,
+    )
+
+    adapter = LimiterAdapter(
+        per_minute=1000,
+        max_retries=retry_strategy,
+        per_host=True,
+        limit_statuses=(429,),
+    )
+
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+
+    return session
+
+
 def flatten_id(record):
     return record | {"id": record.get("bathingWater", {}).get("id")}
 
 
-@dlt.source(name="bathing_waters")
-def bathing_waters():
+@dlt.source()
+def bathing_waters_source():
     config: RESTAPIConfig = {
         "client": {
             "base_url": "https://gw.havochvatten.se//external-public/bathing-waters/v2/",
             "paginator": "single_page",
+            "session": build_throttled_session(),
         },
         "resource_defaults": {
             "write_disposition": "replace",
@@ -57,7 +94,7 @@ def bathing_waters():
             },
             {
                 "name": "results",
-                "selected": True,
+                "selected": False,
                 "endpoint": {
                     "path": "bathing-waters/{resources.waters.id}/results/",
                     "data_selector": "$.results",
@@ -66,7 +103,7 @@ def bathing_waters():
             },
             {
                 "name": "forecasts",
-                "selected": True,
+                "selected": False,
                 "endpoint": {
                     "path": "forecasts/",
                     "params": {"bathingWaterId": "{resources.waters.id}"},
@@ -88,7 +125,7 @@ def main():
         progress="log",
     )
 
-    pipeline.run(bathing_waters())
+    pipeline.run(bathing_waters_source())
 
 
 if __name__ == "__main__":
