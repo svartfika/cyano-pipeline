@@ -66,3 +66,6 @@ def bathing_waters_source():
     }
 
     yield from rest_api_resources(RESTAPIConfig(**config))
+
+
+__all__ = ["bathing_waters_source"]
