@@ -19,7 +19,7 @@ RETRY_STRATEGY = Retry(
 
 
 @configspec
-class BathingWatersSourceConfig:
+class HavochvattenSourceConfig:
     base_url: str = "https://gw.havochvatten.se/external-public/bathing-waters/v2/"
     max_rows: int | None = None
     requests_per_minute: int = 1000
@@ -31,7 +31,7 @@ def flatten_id(record):
 
 
 @dlt.source()
-def bathing_waters_source(config: BathingWatersSourceConfig = dlt.config.value):
+def havochvatten_source(config: HavochvattenSourceConfig = dlt.config.value):
     config: RESTAPIConfig = {
         "client": {
             "base_url": config.base_url,
@@ -91,4 +91,4 @@ def bathing_waters_source(config: BathingWatersSourceConfig = dlt.config.value):
     yield from rest_api_resources(RESTAPIConfig(**config))
 
 
-__all__ = ["bathing_waters_source"]
+__all__ = ["havochvatten_source"]

@@ -1,6 +1,8 @@
+"""Run with: uv run python -m src.bathing_waters.defs.dlt.sources.havochvatten"""
+
 import dlt
 
-from . import bathing_waters_source
+from . import havochvatten_source
 
 DB_NAME = "bathing_waters"
 DB_SCHEMA = "raw"
@@ -14,6 +16,6 @@ def run_pipeline():
         progress="log",
     )
 
-    load_info = pipeline.run(bathing_waters_source())
+    load_info = pipeline.run(havochvatten_source())
     print(load_info)
     return load_info
