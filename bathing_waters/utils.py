@@ -1,3 +1,4 @@
+from typing import Any
 from dlt.sources.helpers import requests
 from requests_ratelimiter import LimiterAdapter
 from urllib3.util.retry import Retry
@@ -15,28 +16,56 @@ class RowCountFilter:
         return True
 
 
-def build_throttled_session():
-    session = requests.Session(raise_for_status=False)
+def build_throttled_session(
+    *,
+    auth_token: str | None = None,
+    requests_per_minute: int = 1000,
+    timeout: float | None = 30.0,
+    raise_for_status: bool = False,
+    retry_strategy: Retry | None = None,
+    limiter_kwargs: dict[str, Any] | None = None,
+) -> requests.Session:
+    session = requests.Session(raise_for_status=raise_for_status)
 
-    retry_strategy = Retry(
-        total=5,
-        backoff_factor=0.5,
-        status_forcelist=[408, 429, 500, 502, 503, 504],
-        allowed_methods=["GET", "HEAD", "OPTIONS", "POST"],
-        connect=3,
-        read=3,
-        status=3,
-        raise_on_status=False,
-    )
+    if auth_token:
+        session.headers.update({"Authorization": f"Bearer {auth_token}"})
 
-    adapter = LimiterAdapter(
-        per_minute=1000,
+    if retry_strategy is None:
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=0.3,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET", "HEAD", "OPTIONS"],
+            connect=3,
+            read=3,
+            status=3,
+            raise_on_status=False,
+        )
+
+    limiter_defaults = {
+        "per_minute": requests_per_minute,
+        "max_retries": retry_strategy,
+        "limit_statuses": (429,),
+        "per_host": True,
+    }
+
+    user_kwargs = limiter_kwargs or {}
+    final_kwargs = {**limiter_defaults, **user_kwargs}
+    limiter_adapter = LimiterAdapter(**final_kwargs)
+
+    limiter_adapter = LimiterAdapter(
+        per_minute=requests_per_minute,
         max_retries=retry_strategy,
-        per_host=True,
         limit_statuses=(429,),
+        per_host=True,
     )
 
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
+    session.mount("http://", limiter_adapter)
+    session.mount("https://", limiter_adapter)
+
+    if timeout is not None:
+        session.request = lambda *args, **kwargs: session.request(
+            *args, timeout=(kwargs.pop("timeout", timeout) if timeout is not None else None), **kwargs
+        )
 
     return session
