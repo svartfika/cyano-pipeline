@@ -14,4 +14,6 @@ def run_pipeline():
         progress="log",
     )
 
-    pipeline.run(bathing_waters_source())
+    load_info = pipeline.run(bathing_waters_source())
+    print(load_info)
+    return load_info
