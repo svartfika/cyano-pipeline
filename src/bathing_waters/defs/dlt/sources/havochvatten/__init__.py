@@ -1,28 +1,16 @@
 import dlt
 from dlt.sources.config import configspec
 from dlt.sources.rest_api import RESTAPIConfig, rest_api_resources
-from urllib3 import Retry
 
 from .utils import RowCountFilter, build_throttled_session
-
-
-RETRY_STRATEGY = Retry(
-    total=5,
-    backoff_factor=0.5,
-    status_forcelist=[408, 429, 500, 502, 503, 504],
-    allowed_methods=["GET", "HEAD", "OPTIONS", "POST"],
-    connect=3,
-    read=3,
-    status=3,
-    raise_on_status=False,
-)
 
 
 @configspec
 class HavochvattenSourceConfig:
     base_url: str = "https://gw.havochvatten.se/external-public/bathing-waters/v2/"
     max_rows: int | None = None
-    requests_per_minute: int = 1000
+    requests_per_second: float = 10
+    requests_per_minute: int = 600
     parallelized: bool = True
 
 
@@ -38,7 +26,7 @@ def havochvatten_source(config: HavochvattenSourceConfig = dlt.config.value):
             "paginator": "single_page",
             "session": build_throttled_session(
                 requests_per_minute=config.requests_per_minute,
-                retry_strategy=RETRY_STRATEGY,
+                requests_per_second=config.requests_per_second,
             ),
         },
         "resource_defaults": {
