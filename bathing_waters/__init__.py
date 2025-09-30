@@ -1,9 +1,14 @@
 import dlt
+from dlt.sources.config import configspec
 from dlt.sources.rest_api import RESTAPIConfig, rest_api_resources
 
 from .utils import RowCountFilter, build_throttled_session
 
-ROW_COUNT_LIMIT = None
+
+@configspec
+class BathingWatersSourceConfig:
+    parallelized: True
+    max_rows: int | None = None
 
 
 def flatten_id(record):
@@ -11,7 +16,7 @@ def flatten_id(record):
 
 
 @dlt.source()
-def bathing_waters_source():
+def bathing_waters_source(config: BathingWatersSourceConfig = dlt.config.value):
     config: RESTAPIConfig = {
         "client": {
             "base_url": "https://gw.havochvatten.se/external-public/bathing-waters/v2/",
@@ -21,7 +26,7 @@ def bathing_waters_source():
         "resource_defaults": {
             "write_disposition": "replace",
             "max_table_nesting": 5,
-            "parallelized": True,
+            "parallelized": config.parallelized,
         },
         "resources": [
             {
@@ -29,7 +34,7 @@ def bathing_waters_source():
                 "selected": False,
                 "endpoint": {"path": "bathing-waters/"},
                 "processing_steps": [
-                    {"filter": RowCountFilter(max_rows=ROW_COUNT_LIMIT)},
+                    {"filter": RowCountFilter(max_rows=config.max_rows)},
                     {"map": flatten_id},
                 ],
                 "write_disposition": "skip",
