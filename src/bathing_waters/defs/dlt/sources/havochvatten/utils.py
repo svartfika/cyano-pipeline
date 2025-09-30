@@ -19,7 +19,8 @@ class RowCountFilter:
 def build_throttled_session(
     *,
     auth_token: str | None = None,
-    requests_per_minute: int = 1000,
+    requests_per_second: float = 2,
+    requests_per_minute: int = 15,
     timeout: float | None = 30.0,
     raise_for_status: bool = False,
     retry_strategy: Retry | None = None,
@@ -32,17 +33,19 @@ def build_throttled_session(
 
     if retry_strategy is None:
         retry_strategy = Retry(
-            total=3,
-            backoff_factor=0.3,
-            status_forcelist=[429, 500, 502, 503, 504],
+            total=5,
+            backoff_factor=2.0,
+            status_forcelist=[500, 502, 503, 504],
             allowed_methods=["GET", "HEAD", "OPTIONS"],
             connect=3,
             read=3,
-            status=3,
+            status=1,
             raise_on_status=False,
+            respect_retry_after_header=True,
         )
 
     limiter_defaults = {
+        "per_second": requests_per_second,
         "per_minute": requests_per_minute,
         "max_retries": retry_strategy,
         "limit_statuses": (429,),
@@ -52,13 +55,6 @@ def build_throttled_session(
     user_kwargs = limiter_kwargs or {}
     final_kwargs = {**limiter_defaults, **user_kwargs}
     limiter_adapter = LimiterAdapter(**final_kwargs)
-
-    limiter_adapter = LimiterAdapter(
-        per_minute=requests_per_minute,
-        max_retries=retry_strategy,
-        limit_statuses=(429,),
-        per_host=True,
-    )
 
     session.mount("http://", limiter_adapter)
     session.mount("https://", limiter_adapter)
