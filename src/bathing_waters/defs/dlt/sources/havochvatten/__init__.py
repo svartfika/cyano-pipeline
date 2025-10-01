@@ -1,17 +1,21 @@
+import logging
 import dlt
 from dlt.sources.config import configspec
 from dlt.sources.rest_api import RESTAPIConfig, rest_api_resources
 
 from .utils import RowCountFilter, build_throttled_session
 
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
 
 @configspec
 class HavochvattenSourceConfig:
     base_url: str = "https://gw.havochvatten.se/external-public/bathing-waters/v2/"
     max_rows: int | None = None
-    requests_per_second: float = 10
-    requests_per_minute: int = 600
-    parallelized: bool = True
+    requests_per_second: float = 8
+    requests_per_minute: int = 480
+    parallelized: bool = False
 
 
 def flatten_id(record):
