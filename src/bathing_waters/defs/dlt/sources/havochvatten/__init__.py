@@ -1,4 +1,5 @@
 import logging
+
 import dlt
 from dlt.sources.config import configspec
 from dlt.sources.rest_api import RESTAPIConfig, rest_api_resources
@@ -34,7 +35,6 @@ def havochvatten_source(config: HavochvattenSourceConfig = dlt.config.value):
             ),
         },
         "resource_defaults": {
-            "write_disposition": "skip",
             "max_table_nesting": 5,
             "parallelized": config.parallelized,
         },
@@ -47,6 +47,7 @@ def havochvatten_source(config: HavochvattenSourceConfig = dlt.config.value):
                     {"filter": RowCountFilter(max_rows=config.max_rows)},
                     {"map": flatten_id},
                 ],
+                "write_disposition": "replace",
             },
             {
                 "name": "profiles",
@@ -68,7 +69,7 @@ def havochvatten_source(config: HavochvattenSourceConfig = dlt.config.value):
                     "incremental": {
                         "cursor_path": "takenAt",
                         "initial_value": "2000-01-01 00:00:00+00",  # ISO 8601
-                    }
+                    },
                 },
                 "write_disposition": "append",
             },
@@ -81,6 +82,7 @@ def havochvatten_source(config: HavochvattenSourceConfig = dlt.config.value):
                     "params": {"bathingWaterId": "{resources.waters.id}"},
                     "data_selector": "$.forecasts",
                 },
+                "write_disposition": "replace",
             },
         ],
     }
@@ -88,4 +90,7 @@ def havochvatten_source(config: HavochvattenSourceConfig = dlt.config.value):
     yield from rest_api_resources(RESTAPIConfig(**config))
 
 
-__all__ = ["havochvatten_source"]
+profiles = havochvatten_source().with_resources("profiles")
+samples = havochvatten_source().with_resources("results")
+
+__all__ = ["havochvatten_source", "profiles", "samples"]
