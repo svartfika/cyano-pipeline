@@ -1,0 +1,13 @@
+[project]
+name = "bw-local-dev"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "dlt[duckdb]>=1.17.0",
+    "pydantic>=2.11.9",
+    "pydantic-settings>=2.11.0",
+    "psutil>=7.1.0",
+    "requests-ratelimiter>=0.7.0",
+]
