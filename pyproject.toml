@@ -1,13 +1,43 @@
 [project]
-name = "bw-local-dev"
+name = "cyano-pipeline"
 version = "0.1.0"
-description = "Add your description here"
+description = ""
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "dagster-dg-cli>=1.12.6",
+    "dagster-duckdb>=0.28.6",
+    "dagster-polars>=0.27.8",
+    "dagster-webserver>=1.12.6",
+    "dagster>=1.12.6",
     "dlt[duckdb]>=1.17.0",
-    "pydantic>=2.11.9",
-    "pydantic-settings>=2.11.0",
     "psutil>=7.1.0",
+    "pydantic-settings>=2.11.0",
+    "pydantic>=2.11.9",
     "requests-ratelimiter>=0.7.0",
 ]
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.36.1",
+    "pytest>=9.0.2",
+    "ruff>=0.14.9",
+]
+
+[tool.dg]
+directory_type = "project"
+
+[tool.dg.project]
+root_module = "cyano_pipeline"
+
+[tool.dg.cli.telemetry]
+enabled = false
+
+[tool.basedpyright]
+reportAny = false
+reportExplicitAny = false
+
+reportMissingTypeStubs = false
+reportUnknownArgumentType = false
+reportUnknownMemberType = false
+reportUnknownVariableType = false
