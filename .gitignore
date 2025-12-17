@@ -46,7 +46,6 @@ uv.lock
 
 # Editor directories and files
 .idea/
-.vscode/
 *.code-workspace
 *.sublime-project
 *.sublime-workspace
@@ -54,6 +53,12 @@ uv.lock
 .localized
 Thumbs.db
 Desktop.ini
+
+# Shared VSCode settings
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -75,4 +80,3 @@ local_settings.py
 *.cert
 *.secrets
 secrets.json
-
