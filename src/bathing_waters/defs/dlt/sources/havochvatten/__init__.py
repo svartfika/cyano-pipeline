@@ -16,7 +16,6 @@ class HavochvattenSourceConfig:
     max_rows: int | None = None
     requests_per_second: float = 8
     requests_per_minute: int = 480
-    parallelized: bool = False
 
 
 def flatten_id(record):
@@ -34,10 +33,7 @@ def havochvatten_source(config: HavochvattenSourceConfig = dlt.config.value):
                 requests_per_second=config.requests_per_second,
             ),
         },
-        "resource_defaults": {
-            "max_table_nesting": 5,
-            "parallelized": config.parallelized,
-        },
+        "resource_defaults": {"max_table_nesting": 5},
         "resources": [
             {
                 "name": "waters",
