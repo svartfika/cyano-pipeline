@@ -17,6 +17,13 @@ dependencies = [
     "requests-ratelimiter>=0.7.0",
 ]
 
+[dependency-groups]
+dev = [
+    "basedpyright>=1.36.1",
+    "pytest>=9.0.2",
+    "ruff>=0.14.9",
+]
+
 [tool.dg]
 directory_type = "project"
 
@@ -25,3 +32,12 @@ root_module = "cyano_pipeline"
 
 [tool.dg.cli.telemetry]
 enabled = false
+
+[tool.basedpyright]
+reportAny = false
+reportExplicitAny = false
+
+reportMissingTypeStubs = false
+reportUnknownArgumentType = false
+reportUnknownMemberType = false
+reportUnknownVariableType = false
