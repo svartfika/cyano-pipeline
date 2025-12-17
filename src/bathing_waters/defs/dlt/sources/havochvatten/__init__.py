@@ -34,7 +34,7 @@ def havochvatten_source(config: HavochvattenSourceConfig = dlt.config.value):
             ),
         },
         "resource_defaults": {
-            "write_disposition": "replace",
+            "write_disposition": "skip",
             "max_table_nesting": 5,
             "parallelized": config.parallelized,
         },
@@ -47,35 +47,40 @@ def havochvatten_source(config: HavochvattenSourceConfig = dlt.config.value):
                     {"filter": RowCountFilter(max_rows=config.max_rows)},
                     {"map": flatten_id},
                 ],
-                "write_disposition": "skip",
             },
             {
                 "name": "profiles",
-                "selected": True,
+                "selected": False,
+                "include_from_parent": ["id"],
                 "endpoint": {
                     "path": "bathing-waters/{resources.waters.id}/profiles/",
                     "data_selector": "$",
                 },
-                "include_from_parent": ["id"],
+                "write_disposition": {"disposition": "merge", "strategy": "scd2"},
             },
             {
                 "name": "results",
-                "selected": True,
+                "selected": False,
+                "include_from_parent": ["id"],
                 "endpoint": {
                     "path": "bathing-waters/{resources.waters.id}/results/",
                     "data_selector": "$.results",
+                    "incremental": {
+                        "cursor_path": "takenAt",
+                        "initial_value": "2000-01-01 00:00:00+00",  # ISO 8601
+                    }
                 },
-                "include_from_parent": ["id"],
+                "write_disposition": "append",
             },
             {
                 "name": "forecasts",
-                "selected": True,
+                "selected": False,
+                "include_from_parent": ["id"],
                 "endpoint": {
                     "path": "forecasts/",
                     "params": {"bathingWaterId": "{resources.waters.id}"},
                     "data_selector": "$.forecasts",
                 },
-                "include_from_parent": ["id"],
             },
         ],
     }
