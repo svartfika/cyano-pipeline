@@ -1,19 +1,20 @@
-from typing import Any
+from typing import Any, override
+
 from dlt.sources.helpers import requests
 from requests_ratelimiter import LimiterAdapter
 from urllib3.util.retry import Retry
 
 
-class RowCountFilter:
-    def __init__(self, max_rows=None):
-        self.count = 0
-        self.max_rows = max_rows
+class TimeoutSession(requests.Session):
+    """A custom session class that applies a default timeout to all requests."""
+    def __init__(self, timeout: float | None = None, **kwargs: Any):
+        self.timeout: float | None = timeout
+        super().__init__(**kwargs)
 
-    def __call__(self, record):
-        if self.max_rows and self.count >= self.max_rows:
-            return False
-        self.count += 1
-        return True
+    @override
+    def request(self, method: str, url: str, *args: Any, **kwargs: Any) -> requests.Response:
+        kwargs.setdefault("timeout", self.timeout)
+        return super().request(method, url, *args, **kwargs)
 
 
 def build_throttled_session(
@@ -26,7 +27,8 @@ def build_throttled_session(
     retry_strategy: Retry | None = None,
     limiter_kwargs: dict[str, Any] | None = None,
 ) -> requests.Session:
-    session = requests.Session(raise_for_status=raise_for_status)
+    """Builds a throttled session with rate limiting and retry logic."""
+    session: TimeoutSession = TimeoutSession(timeout=timeout, raise_for_status=raise_for_status)
 
     if auth_token:
         session.headers.update({"Authorization": f"Bearer {auth_token}"})
@@ -52,16 +54,11 @@ def build_throttled_session(
         "per_host": True,
     }
 
-    user_kwargs = limiter_kwargs or {}
-    final_kwargs = {**limiter_defaults, **user_kwargs}
-    limiter_adapter = LimiterAdapter(**final_kwargs)
+    user_kwargs: dict[str, Any] = limiter_kwargs or {}
+    final_kwargs: dict[str, Any] = {**limiter_defaults, **user_kwargs}
+    limiter_adapter: LimiterAdapter = LimiterAdapter(**final_kwargs)
 
     session.mount("http://", limiter_adapter)
     session.mount("https://", limiter_adapter)
-
-    if timeout is not None:
-        session.request = lambda *args, **kwargs: session.request(
-            *args, timeout=(kwargs.pop("timeout", timeout) if timeout is not None else None), **kwargs
-        )
 
     return session
