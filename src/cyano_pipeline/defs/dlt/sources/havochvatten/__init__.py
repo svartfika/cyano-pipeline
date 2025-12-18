@@ -10,7 +10,7 @@ from dlt.extract.source import DltSource
 from dlt.sources.rest_api import rest_api_resources
 from dlt.sources.rest_api.typing import RESTAPIConfig
 
-from .utils import throttled_session
+from ..http import throttled_session
 
 logging.basicConfig(level=logging.DEBUG)
 logger: Logger = logging.getLogger(__name__)
