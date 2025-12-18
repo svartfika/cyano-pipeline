@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "dagster-dg-cli>=1.12.6",
+    "dagster-dlt>=0.28.6",
     "dagster-duckdb>=0.28.6",
     "dagster-polars>=0.27.8",
     "dagster-webserver>=1.12.6",
@@ -18,11 +19,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = [
-    "basedpyright>=1.36.1",
-    "pytest>=9.0.2",
-    "ruff>=0.14.9",
-]
+dev = ["basedpyright>=1.36.1", "pytest>=9.0.2", "ruff>=0.14.9"]
 
 [tool.dg]
 directory_type = "project"
@@ -34,10 +31,40 @@ root_module = "cyano_pipeline"
 enabled = false
 
 [tool.basedpyright]
-reportAny = false
-reportExplicitAny = false
+typeCheckingMode = "recommended"
+pythonVersion = "3.13"
 
-reportMissingTypeStubs = false
-reportUnknownArgumentType = false
-reportUnknownMemberType = false
-reportUnknownVariableType = false
+# Environment Settings
+useLibraryCodeForTypes = true # Analyzes library source to "guess" types if stubs are missing
+# stubPath = "typings"        # Relative path to your custom type definitions
+
+# Data Engineering Overrides
+# These suppress "Any/Unknown" noise common when using DataFrames or API clients
+reportAny = false                  # Don't flag expressions that leak the 'Any' type
+reportExplicitAny = false          # Allow 'Any' in type hints as a fallback
+reportUnknownMemberType = false    # Allow accessing untyped attributes (e.g. df.column_name)
+reportUnknownVariableType = false  # Allow variables to have unresolved types from external data
+reportUnknownArgumentType = false  # Allow passing untyped variables into function calls
+reportUnknownParameterType = false # Allow functions to accept data with unresolved types
+reportMissingTypeStubs = false     # Silence warnings for libraries without 'py.typed' files
+
+# Core Safety
+# These catch logic bugs that actually cause production failures
+reportUnboundVariable = "error"      # Catch variables used before they are assigned
+reportUndefinedVariable = "error"    # Catch typos in variable names
+reportOptionalMemberAccess = "error" # Prevent 'NoneType has no attribute' runtime errors
+reportOptionalSubscript = "error"    # Prevent 'NoneType is not subscriptable' errors
+
+# Code Hygiene
+reportUnusedImport = "warning"
+reportUnusedVariable = "warning"
+reportDuplicateImport = "warning"
+reportImplicitStringConcatenation = "warning" # Catches missing commas in lists of strings
+
+# Library Trust List
+allowedUntypedLibraries = ["pandas", "pyspark", "boto3"]
+
+# Inference Logic
+strictListInference = true
+strictDictionaryInference = true
+strictSetInference = true
