@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from typing import Any, override
 
 import dlt
@@ -11,15 +11,26 @@ from dagster import (
     AssetSpec,
     MaterializeResult,
 )
+from dagster._core.storage.db_io_manager import DbTypeHandler
 from dagster_dlt import DagsterDltResource, dlt_assets
 from dagster_dlt.translator import DagsterDltTranslator, DltResourceTranslatorData
-from dagster_duckdb import DuckDBResource
+from dagster_duckdb import DuckDBIOManager, DuckDBResource
 from dlt.extract.source import DltSource
 from packaging.version import Version
 
 _DEFAULT_PIPELINE_KWARGS: dict[str, Any] = {
     "progress": "log",
 }
+
+
+class DefaultDuckDBIOManager(DuckDBIOManager):
+    """Concrete DuckDB IO manager to satisfy Dagster requirements for DLT-managed assets."""
+
+    @staticmethod
+    @override
+    def type_handlers() -> Sequence[DbTypeHandler[Any]]:
+        """Return empty handlers as DLT manages data writing internally."""
+        return []
 
 
 class DltDuckDBTranslator(DagsterDltTranslator):
@@ -40,6 +51,8 @@ def build_dlt_duckdb_asset(
     pipeline_name: str,
     dataset_name: str,
     *,
+    duckdb_resource: DuckDBResource,
+    dlt_resource: DagsterDltResource,
     group_name: str | None = None,
     translator: DagsterDltTranslator | None = None,
     asset_kwargs: dict[str, Any] | None = None,
@@ -93,4 +106,15 @@ def build_dlt_duckdb_asset(
             **effective_run_kwargs,
         )
 
-    return _asset
+    auto_io_manager = DefaultDuckDBIOManager(
+        database=duckdb_resource.database,
+        connection_config=duckdb_resource.connection_config,
+    )
+
+    return _asset.with_resources(
+        {
+            "dlt_res": dlt_resource.get_resource_definition(),
+            "duckdb_res": duckdb_resource.get_resource_definition(),
+            "io_manager": auto_io_manager.get_resource_definition(),
+        }
+    )
