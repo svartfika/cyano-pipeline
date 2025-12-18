@@ -4,6 +4,8 @@ from types import SimpleNamespace
 from typing import Any, TypedDict, Unpack
 
 from dlt.sources.helpers.requests import Session
+from dlt.sources.helpers.rest_client.auth import AuthConfigBase
+from requests.auth import AuthBase
 from requests_ratelimiter import LimiterAdapter
 from urllib3.util.retry import Retry
 
@@ -11,7 +13,7 @@ from urllib3.util.retry import Retry
 class SessionConfig(TypedDict, total=False):
     """Configuration schema for a throttled dlt session."""
 
-    auth_token: str | None
+    auth: str | AuthBase | AuthConfigBase | None
     headers: dict[str, str] | None
     requests_per_second: float | None
     requests_per_minute: float | None
@@ -21,12 +23,12 @@ class SessionConfig(TypedDict, total=False):
     limiter_kwargs: dict[str, Any] | None
 
 
-_DEFAULT_CONFIG: dict[str, float | bool | None] = {
+_DEFAULT_CONFIG: dict[str, Any] = {
     "timeout": 30.0,
     "raise_for_status": False,
     "requests_per_second": 2.0,
     "requests_per_minute": 15.0,
-    "auth_token": None,
+    "auth": None,
     "headers": None,
     "retry_strategy": None,
     "limiter_kwargs": None,
@@ -43,8 +45,7 @@ _DEFAULT_RETRY_STRATEGY: Retry = Retry(
 
 
 def build_throttled_session(**kwargs: Unpack[SessionConfig]) -> Session:
-    """Create a rate-limited dlt HTTP session with integrated retry logic."""
-
+    """Create a rate-limited dlt HTTP session with integrated retry and auth logic."""
     config: SimpleNamespace = SimpleNamespace(**{**_DEFAULT_CONFIG, **kwargs})
 
     session: Session = Session(
@@ -52,10 +53,14 @@ def build_throttled_session(**kwargs: Unpack[SessionConfig]) -> Session:
         raise_for_status=config.raise_for_status,
     )
 
+    if config.auth:
+        if isinstance(config.auth, str):
+            session.headers.update({"Authorization": f"Bearer {config.auth}"})
+        else:
+            session.auth = config.auth
+
     if config.headers:
         session.headers.update(config.headers)
-    if config.auth_token:
-        session.headers.update({"Authorization": f"Bearer {config.auth_token}"})
 
     retry_strategy: Retry = config.retry_strategy or _DEFAULT_RETRY_STRATEGY
 
@@ -70,10 +75,9 @@ def build_throttled_session(**kwargs: Unpack[SessionConfig]) -> Session:
     if config.limiter_kwargs:
         limiter_args.update(config.limiter_kwargs)
 
-    if config.requests_per_second or config.requests_per_minute:
+    if config.requests_per_second is not None or config.requests_per_minute is not None:
         limiter_config: dict[str, Any] = {k: v for k, v in limiter_args.items() if v is not None}
         limiter_adapter: LimiterAdapter = LimiterAdapter(**limiter_config)
-
         session.mount("http://", limiter_adapter)
         session.mount("https://", limiter_adapter)
 
