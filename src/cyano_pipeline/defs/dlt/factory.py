@@ -1,6 +1,5 @@
 from collections.abc import Iterator
-from types import SimpleNamespace
-from typing import Any, TypedDict, Unpack, override
+from typing import Any, override
 
 import dlt
 import duckdb
@@ -17,18 +16,6 @@ from dagster_dlt.translator import DagsterDltTranslator, DltResourceTranslatorDa
 from dagster_duckdb import DuckDBResource
 from dlt.extract.source import DltSource
 from packaging.version import Version
-
-
-class DltDuckDBAssetConfig(TypedDict, total=False):
-    """Configuration schema for building DLT DuckDB assets."""
-
-    group_name: str | None
-    translator: DagsterDltTranslator | None
-    asset_kwargs: dict[str, Any] | None
-    pipeline_kwargs: dict[str, Any] | None
-    run_kwargs: dict[str, Any] | None
-    destination_kwargs: dict[str, Any] | None
-
 
 _DEFAULT_PIPELINE_KWARGS: dict[str, Any] = {
     "progress": "log",
@@ -52,47 +39,44 @@ def build_dlt_duckdb_asset(
     source: DltSource,
     pipeline_name: str,
     dataset_name: str,
-    **kwargs: Unpack[DltDuckDBAssetConfig],
+    *,
+    group_name: str | None = None,
+    translator: DagsterDltTranslator | None = None,
+    asset_kwargs: dict[str, Any] | None = None,
+    pipeline_kwargs: dict[str, Any] | None = None,
+    run_kwargs: dict[str, Any] | None = None,
+    destination_kwargs: dict[str, Any] | None = None,
 ) -> AssetsDefinition:
     """Build a Dagster asset from a DLT source writing to DuckDB."""
-    config: SimpleNamespace = SimpleNamespace(
-        group_name=kwargs.get("group_name"),
-        translator=kwargs.get("translator") or DltDuckDBTranslator(),
-        asset_kwargs=kwargs.get("asset_kwargs") or {},
-        run_kwargs=kwargs.get("run_kwargs") or {},
-        destination_kwargs=kwargs.get("destination_kwargs") or {},
-        pipeline_kwargs={
-            **_DEFAULT_PIPELINE_KWARGS,
-            **(kwargs.get("pipeline_kwargs") or {}),
-        },
-    )
+    effective_translator: DagsterDltTranslator | DltDuckDBTranslator = translator or DltDuckDBTranslator()
+    effective_pipeline_kwargs: dict[str, Any] = {**_DEFAULT_PIPELINE_KWARGS, **(pipeline_kwargs or {})}
+    effective_asset_kwargs: dict[str, Any] = asset_kwargs or {}
+    effective_run_kwargs: dict[str, Any] = run_kwargs or {}
+    effective_dest_kwargs: dict[str, Any] = destination_kwargs or {}
 
-    pipeline: dlt.Pipeline = dlt.pipeline(
-        **config.pipeline_kwargs,
+    pipeline = dlt.pipeline(
+        **effective_pipeline_kwargs,
         pipeline_name=pipeline_name,
         dataset_name=dataset_name,
     )
 
-    extra_asset_args: dict[Any, Any] = {k: v for k, v in config.asset_kwargs.items() if v is not None}
-
-    if config.group_name:
-        extra_asset_args["group_name"] = config.group_name
+    if group_name:
+        effective_asset_kwargs["group_name"] = group_name
 
     @dlt_assets(
         dlt_source=source,
         dlt_pipeline=pipeline,
-        dagster_dlt_translator=config.translator,
+        dagster_dlt_translator=effective_translator,
         name=pipeline_name,
-        **extra_asset_args,
+        **effective_asset_kwargs,
     )
     def _asset(
         context: AssetExecutionContext,
         dlt_res: DagsterDltResource,
         duckdb_res: DuckDBResource,
     ) -> Iterator[AssetMaterialization | MaterializeResult[Any]]:
-        """Executes the DLT ingestion process and yields asset materialization metadata."""
-        conn_config: dict[str, Any] = (duckdb_res.connection_config or {}).copy()
-        conn_config.update(config.destination_kwargs)
+        conn_config = (duckdb_res.connection_config or {}).copy()
+        conn_config.update(effective_dest_kwargs)
 
         if Version(duckdb.__version__) >= Version("1.0.0"):
             conn_config.setdefault("custom_user_agent", "dagster")
@@ -106,7 +90,7 @@ def build_dlt_duckdb_asset(
             context=context,
             destination=destination,
             dataset_name=dataset_name,
-            **config.run_kwargs,
+            **effective_run_kwargs,
         )
 
     return _asset
