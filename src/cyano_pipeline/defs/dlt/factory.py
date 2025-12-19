@@ -22,6 +22,8 @@ _DEFAULT_PIPELINE_KWARGS: dict[str, Any] = {
     "progress": "log",
 }
 
+_RESOURCE_CACHE: dict[str, Any] = {}
+
 
 class DefaultDuckDBIOManager(DuckDBIOManager):
     """Concrete DuckDB IO manager to satisfy Dagster requirements for DLT-managed assets."""
@@ -43,6 +45,7 @@ class DltDuckDBTranslator(DagsterDltTranslator):
         return spec.replace_attributes(
             key=AssetKey([dataset, data.resource.name]),
             tags={**spec.tags, "schema": dataset},
+            kinds={*spec.kinds, "duckdb", "dlt"},
         )
 
 
@@ -76,11 +79,13 @@ def build_dlt_duckdb_asset(
     if group_name:
         effective_asset_kwargs["group_name"] = group_name
 
+    definition_name = effective_asset_kwargs.pop("name", dataset_name)
+
     @dlt_assets(
         dlt_source=source,
         dlt_pipeline=pipeline,
         dagster_dlt_translator=effective_translator,
-        name=pipeline_name,
+        name=definition_name,
         **effective_asset_kwargs,
     )
     def _asset(
@@ -106,15 +111,26 @@ def build_dlt_duckdb_asset(
             **effective_run_kwargs,
         )
 
-    auto_io_manager = DefaultDuckDBIOManager(
-        database=duckdb_resource.database,
-        connection_config=duckdb_resource.connection_config,
-    )
+    io_key = f"io:{duckdb_resource.database}"
+    dlt_key = f"res:dlt:{id(dlt_resource)}"
+    duck_key = f"res:duck:{id(duckdb_resource)}"
+
+    if io_key not in _RESOURCE_CACHE:
+        _RESOURCE_CACHE[io_key] = DefaultDuckDBIOManager(
+            database=duckdb_resource.database,
+            connection_config=duckdb_resource.connection_config,
+        ).get_resource_definition()
+
+    if dlt_key not in _RESOURCE_CACHE:
+        _RESOURCE_CACHE[dlt_key] = dlt_resource.get_resource_definition()
+
+    if duck_key not in _RESOURCE_CACHE:
+        _RESOURCE_CACHE[duck_key] = duckdb_resource.get_resource_definition()
 
     return _asset.with_resources(
         {
-            "dlt_res": dlt_resource.get_resource_definition(),
-            "duckdb_res": duckdb_resource.get_resource_definition(),
-            "io_manager": auto_io_manager.get_resource_definition(),
+            "dlt_res": _RESOURCE_CACHE[dlt_key],
+            "duckdb_res": _RESOURCE_CACHE[duck_key],
+            "io_manager": _RESOURCE_CACHE[io_key],
         }
     )

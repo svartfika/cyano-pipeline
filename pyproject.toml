@@ -21,6 +21,13 @@ dependencies = [
 [dependency-groups]
 dev = ["basedpyright>=1.36.1", "pytest>=9.0.2", "ruff>=0.14.9"]
 
+[project.scripts]
+cyano-pipeline = "cyano_pipeline:definitions"
+
+[build-system]
+requires = ["uv_build"]
+build-backend = "uv_build"
+
 [tool.dg]
 directory_type = "project"
 

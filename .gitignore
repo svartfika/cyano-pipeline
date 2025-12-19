@@ -80,3 +80,10 @@ local_settings.py
 *.cert
 *.secrets
 secrets.json
+
+# Data
+data/
+*.duckdb
+
+# Dagster
+.tmp_dagster_*
