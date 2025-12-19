@@ -1,41 +1,34 @@
-import logging
 from collections.abc import Iterator
-from logging import Logger
 from typing import Any
 
 import dlt
-from dlt.common.configuration import configspec
-from dlt.extract.resource import DltResource
-from dlt.extract.source import DltSource
+from dlt.extract import DltResource
 from dlt.sources.rest_api import rest_api_resources
 from dlt.sources.rest_api.typing import RESTAPIConfig
 
 from ..http import throttled_session
 
-logging.basicConfig(level=logging.DEBUG)
-logger: Logger = logging.getLogger(__name__)
+BASE_URL = "https://gw.havochvatten.se/external-public/bathing-waters/v2/"
+REQUESTS_PER_SECOND = 8
 
 
-@configspec
-class HavochvattenSourceConfig:
-    base_url: str = "https://gw.havochvatten.se/external-public/bathing-waters/v2/"
-    requests_per_second: float = 8
-    requests_per_minute: int = 480
+def _flatten_bathing_water_id(record: dict[str, Any]) -> dict[str, Any]:
+    """Extract nested bathingWater.id to top level."""
+    bathing_water = record.get("bathingWater", {})
+    water_id = bathing_water.get("id")
 
+    if not water_id:
+        raise ValueError(f"Record missing bathingWater.id: {record}")
 
-def flatten_id(record: dict[str, Any]) -> dict[str, Any]:
-    return record | {"id": record.get("bathingWater", {}).get("id")}
+    return record | {"id": water_id}
 
 
 @dlt.source()
-def havochvatten_source(config: HavochvattenSourceConfig = dlt.config.value) -> Iterator[DltResource]:
-    with throttled_session(
-        requests_per_minute=config.requests_per_minute,
-        requests_per_second=config.requests_per_second,
-    ) as session:
+def havochvatten_source() -> Iterator[DltResource]:
+    with throttled_session(requests_per_second=REQUESTS_PER_SECOND) as session:
         rest_config: RESTAPIConfig = {
             "client": {
-                "base_url": config.base_url,
+                "base_url": BASE_URL,
                 "paginator": "single_page",
                 "session": session,
             },
@@ -43,16 +36,16 @@ def havochvatten_source(config: HavochvattenSourceConfig = dlt.config.value) -> 
             "resources": [
                 {
                     "name": "waters",
-                    "selected": False,
+                    "selected": False,  # Parent resource to get IDs
                     "endpoint": {"path": "bathing-waters/"},
                     "processing_steps": [
-                        {"map": flatten_id},
+                        {"map": _flatten_bathing_water_id},
                     ],
                     "write_disposition": "replace",
                 },
                 {
                     "name": "profiles",
-                    "selected": False,
+                    "selected": False,  # Slowly-changing, select manually
                     "include_from_parent": ["id"],
                     "endpoint": {
                         "path": "bathing-waters/{resources.waters.id}/profiles/",
@@ -62,7 +55,7 @@ def havochvatten_source(config: HavochvattenSourceConfig = dlt.config.value) -> 
                 },
                 {
                     "name": "results",
-                    "selected": False,
+                    "selected": True,  # Frequent updates, default resource
                     "include_from_parent": ["id"],
                     "endpoint": {
                         "path": "bathing-waters/{resources.waters.id}/results/",
@@ -76,7 +69,7 @@ def havochvatten_source(config: HavochvattenSourceConfig = dlt.config.value) -> 
                 },
                 {
                     "name": "forecasts",
-                    "selected": False,
+                    "selected": False,  # Frequent updates, select manually
                     "include_from_parent": ["id"],
                     "endpoint": {
                         "path": "forecasts/",
@@ -91,7 +84,4 @@ def havochvatten_source(config: HavochvattenSourceConfig = dlt.config.value) -> 
         yield from rest_api_resources(RESTAPIConfig(**rest_config))
 
 
-profiles: DltSource = havochvatten_source().with_resources("profiles")
-samples: DltSource = havochvatten_source().with_resources("results")
-
-__all__ = ["havochvatten_source", "profiles", "samples"]
+__all__ = ["havochvatten_source"]
