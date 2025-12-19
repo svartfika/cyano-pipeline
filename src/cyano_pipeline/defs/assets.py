@@ -1,23 +1,33 @@
-from dagster._core.definitions.assets.definition.assets_definition import AssetsDefinition
+from collections.abc import Iterator
 
-from cyano_pipeline.defs.dlt.factory import build_dlt_duckdb_asset
-from cyano_pipeline.defs.dlt.sources.havochvatten import profiles, samples
-from cyano_pipeline.defs.resources import dlt_res, duckdb_res
+import dagster as dg
+import dlt
+from dagster_dlt import DagsterDltResource, dlt_assets
+from dagster_dlt.dlt_event_iterator import DltEventType
+from dlt.destinations.impl.duckdb.configuration import DuckDbCredentials
 
-SCHEMA_NAME = "havochvatten_raw"
+from cyano_pipeline.defs.dlt.sources.havochvatten import havochvatten_source
+from cyano_pipeline.defs.resources import DUCKDB_PATH
 
-extract_havochvatten_profiles: AssetsDefinition = build_dlt_duckdb_asset(
-    source=profiles,
-    pipeline_name=SCHEMA_NAME,
-    dataset_name="havochvatten_profiles",
-    duckdb_resource=duckdb_res,
-    dlt_resource=dlt_res,
+DUCKDB_CREDENTIALS: DuckDbCredentials = DuckDbCredentials(
+    conn_or_path=str(DUCKDB_PATH),
 )
 
-extract_havochvatten_samples: AssetsDefinition = build_dlt_duckdb_asset(
-    source=samples,
-    pipeline_name=SCHEMA_NAME,
-    dataset_name="havochvatten_samples",
-    duckdb_resource=duckdb_res,
-    dlt_resource=dlt_res,
+DATASET_NAME = "raw"
+
+_DLT_DUCKDB_POOL = "duckdb_write"
+
+
+@dlt_assets(
+    dlt_source=havochvatten_source().with_resources("profiles", "results"),
+    dlt_pipeline=dlt.pipeline(
+        pipeline_name="dlt_havochvatten",
+        destination=dlt.destinations.duckdb(credentials=DUCKDB_CREDENTIALS),
+        dataset_name=DATASET_NAME,
+        progress="log",
+    ),
+    group_name="dlt_havochvatten",
+    pool=_DLT_DUCKDB_POOL,
 )
+def havochvatten_assets(context: dg.AssetExecutionContext, dlt: DagsterDltResource) -> Iterator[DltEventType]:
+    yield from dlt.run(context=context)
