@@ -25,6 +25,10 @@ def _flatten_bathing_water_id(record: dict[str, Any]) -> dict[str, Any]:
 
 @dlt.source()
 def havochvatten_source() -> Iterator[DltResource]:
+    """Havochvatten bathing water API source.
+    
+    Resources: waters (parent only), profiles (SCD2), results (incremental), forecasts
+    """
     with throttled_session(requests_per_second=REQUESTS_PER_SECOND) as session:
         rest_config: RESTAPIConfig = {
             "client": {

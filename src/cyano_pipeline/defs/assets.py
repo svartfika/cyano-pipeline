@@ -30,4 +30,5 @@ _DLT_DUCKDB_POOL = "duckdb_write"
     pool=_DLT_DUCKDB_POOL,
 )
 def havochvatten_assets(context: dg.AssetExecutionContext, dlt: DagsterDltResource) -> Iterator[DltEventType]:
+    """Loads profiles (SCD2) and results (incremental) from Havochvatten API."""
     yield from dlt.run(context=context)
