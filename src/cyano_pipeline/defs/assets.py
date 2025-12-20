@@ -8,6 +8,7 @@ from dagster_dlt import DagsterDltResource, dlt_assets
 from dagster_dlt.dlt_event_iterator import DltEventType
 from dagster_duckdb import DuckDBResource
 from dlt.destinations.impl.duckdb.configuration import DuckDbCredentials
+from duckdb import DuckDBPyConnection
 
 from cyano_pipeline.defs.dlt.sources.havochvatten import havochvatten_source
 from cyano_pipeline.defs.resources import DUCKDB_PATH
@@ -20,6 +21,17 @@ DUCKDB_CREDENTIALS: DuckDbCredentials = DuckDbCredentials(
 )
 
 _DLT_DUCKDB_POOL = "duckdb_write"
+
+
+def count_table_rows(conn: DuckDBPyConnection, schema_name: str, table_name: str) -> int | None:
+    """Get the row count for a table (fully qualified table name)."""
+    fq_table_name = f"{schema_name}.{table_name}"
+
+    row_count = conn.execute(
+        query=f"SELECT COUNT(*) FROM {fq_table_name};",
+    ).fetchone()
+
+    return row_count[0] if row_count else None
 
 
 @dlt_assets(
@@ -62,17 +74,15 @@ WHERE _dlt_valid_to IS NULL;
     """
     with duckdb.get_connection() as conn:
         _ = conn.execute(query=query)
-
-        row_count = conn.execute(
-            query=f"SELECT COUNT(*) FROM {fq_table_name};",
-        ).fetchone()
+        row_count = count_table_rows(conn, fq_table_name)
 
         return dg.MaterializeResult(
             metadata={
-                "row_count": row_count[0] if row_count else None,
+                "row_count": row_count,
                 "table": fq_table_name,
             },
         )
+
 
 @dg.asset(
     deps=["dlt_havochvatten_source_results"],
@@ -97,14 +107,11 @@ FROM {SCHEMA_RAW_HAVOCHVATTEN}.results;
     """
     with duckdb.get_connection() as conn:
         _ = conn.execute(query=query)
-
-        row_count = conn.execute(
-            query=f"SELECT COUNT(*) FROM {fq_table_name};",
-        ).fetchone()
+        row_count = count_table_rows(conn, fq_table_name)
 
         return dg.MaterializeResult(
             metadata={
-                "row_count": row_count[0] if row_count else None,
+                "row_count": row_count,
                 "table": fq_table_name,
             },
         )
