@@ -3,6 +3,7 @@ from typing import Any
 
 import dagster as dg
 import dlt
+from dagster import TableColumn, TableSchema
 from dagster._core.definitions.result import MaterializeResult
 from dagster_dlt import DagsterDltResource, dlt_assets
 from dagster_dlt.dlt_event_iterator import DltEventType
@@ -34,6 +35,34 @@ def count_table_rows(conn: DuckDBPyConnection, schema_name: str, table_name: str
     return row_count[0] if row_count else None
 
 
+def build_table_schema(conn: DuckDBPyConnection, schema_name: str, table_name: str) -> tuple[int, TableSchema]:
+    """Build a TableSchema object from database column metadata."""
+    query = """
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_schema = ?
+AND table_name = ?
+ORDER BY ordinal_position
+    """
+
+    schema_info = conn.execute(
+        query=query,
+        parameters=[schema_name, table_name],
+    ).fetchall()
+
+    table_schema = TableSchema(
+        columns=[
+            TableColumn(
+                name=col[0],
+                type=col[1],
+            )
+            for col in schema_info
+        ]
+    )
+
+    return len(schema_info), table_schema
+
+
 @dlt_assets(
     dlt_source=havochvatten_source().with_resources("profiles", "results"),
     dlt_pipeline=dlt.pipeline(
@@ -57,12 +86,12 @@ def havochvatten_assets(context: dg.AssetExecutionContext, dlt: DagsterDltResour
     kinds={"duckdb"},
 )
 def dim_bathing_waters(duckdb: DuckDBResource) -> MaterializeResult[Any]:
-    schema = SCHEMA_CORE
-    table = "dim_bathing_waters"
-    fq_table_name = f"{schema}.{table}"
+    schema_name = SCHEMA_CORE
+    table_name = "dim_bathing_waters"
+    fq_table_name = f"{schema_name}.{table_name}"
 
     query = f"""
-CREATE SCHEMA IF NOT EXISTS {schema};
+CREATE SCHEMA IF NOT EXISTS {schema_name};
 
 CREATE OR REPLACE TABLE {fq_table_name} AS
 SELECT
@@ -74,12 +103,15 @@ WHERE _dlt_valid_to IS NULL;
     """
     with duckdb.get_connection() as conn:
         _ = conn.execute(query=query)
-        row_count = count_table_rows(conn, fq_table_name)
+        row_count = count_table_rows(conn, schema_name, table_name)
+        col_count, table_schema = build_table_schema(conn, schema_name, table_name)
 
         return dg.MaterializeResult(
             metadata={
                 "row_count": row_count,
                 "table": fq_table_name,
+                "columns": col_count,
+                "schema": table_schema
             },
         )
 
@@ -91,12 +123,12 @@ WHERE _dlt_valid_to IS NULL;
     kinds={"duckdb"},
 )
 def fact_water_samples(duckdb: DuckDBResource) -> MaterializeResult[Any]:
-    schema = SCHEMA_CORE
-    table = "fact_water_samples"
-    fq_table_name = f"{schema}.{table}"
+    schema_name = SCHEMA_CORE
+    table_name = "fact_water_samples"
+    fq_table_name = f"{schema_name}.{table_name}"
 
     query = f"""
-CREATE SCHEMA IF NOT EXISTS {schema};
+CREATE SCHEMA IF NOT EXISTS {schema_name};
 
 CREATE OR REPLACE TABLE {fq_table_name} AS
 SELECT
@@ -107,11 +139,14 @@ FROM {SCHEMA_RAW_HAVOCHVATTEN}.results;
     """
     with duckdb.get_connection() as conn:
         _ = conn.execute(query=query)
-        row_count = count_table_rows(conn, fq_table_name)
+        row_count = count_table_rows(conn, schema_name, table_name)
+        col_count, table_schema = build_table_schema(conn, schema_name, table_name)
 
         return dg.MaterializeResult(
             metadata={
                 "row_count": row_count,
                 "table": fq_table_name,
+                "columns": col_count,
+                "schema": table_schema
             },
         )
