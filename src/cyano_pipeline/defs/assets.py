@@ -3,16 +3,15 @@ from typing import Any
 
 import dagster as dg
 import dlt
-from dagster import TableColumn, TableSchema
 from dagster._core.definitions.result import MaterializeResult
 from dagster_dlt import DagsterDltResource, dlt_assets
 from dagster_dlt.dlt_event_iterator import DltEventType
 from dagster_duckdb import DuckDBResource
 from dlt.destinations.impl.duckdb.configuration import DuckDbCredentials
-from duckdb import DuckDBPyConnection
 
 from cyano_pipeline.defs.dlt.sources.havochvatten import havochvatten_source
 from cyano_pipeline.defs.resources import DUCKDB_PATH
+from cyano_pipeline.defs.utils import build_table_schema, count_table_rows
 
 SCHEMA_RAW_HAVOCHVATTEN = "raw_havochvatten"
 SCHEMA_CORE = "core"
@@ -22,45 +21,6 @@ DUCKDB_CREDENTIALS: DuckDbCredentials = DuckDbCredentials(
 )
 
 _DLT_DUCKDB_POOL = "duckdb_write"
-
-
-def count_table_rows(conn: DuckDBPyConnection, schema_name: str, table_name: str) -> int | None:
-    """Get the row count for a table (fully qualified table name)."""
-    fq_table_name = f"{schema_name}.{table_name}"
-
-    row_count = conn.execute(
-        query=f"SELECT COUNT(*) FROM {fq_table_name};",
-    ).fetchone()
-
-    return row_count[0] if row_count else None
-
-
-def build_table_schema(conn: DuckDBPyConnection, schema_name: str, table_name: str) -> tuple[int, TableSchema]:
-    """Build a TableSchema object from database column metadata."""
-    query = """
-SELECT column_name, data_type
-FROM information_schema.columns
-WHERE table_schema = ?
-AND table_name = ?
-ORDER BY ordinal_position
-    """
-
-    schema_info = conn.execute(
-        query=query,
-        parameters=[schema_name, table_name],
-    ).fetchall()
-
-    table_schema = TableSchema(
-        columns=[
-            TableColumn(
-                name=col[0],
-                type=col[1],
-            )
-            for col in schema_info
-        ]
-    )
-
-    return len(schema_info), table_schema
 
 
 @dlt_assets(
@@ -107,12 +67,7 @@ WHERE _dlt_valid_to IS NULL;
         col_count, table_schema = build_table_schema(conn, schema_name, table_name)
 
         return dg.MaterializeResult(
-            metadata={
-                "row_count": row_count,
-                "table": fq_table_name,
-                "columns": col_count,
-                "schema": table_schema
-            },
+            metadata={"row_count": row_count, "table": fq_table_name, "columns": col_count, "schema": table_schema},
         )
 
 
@@ -143,10 +98,5 @@ FROM {SCHEMA_RAW_HAVOCHVATTEN}.results;
         col_count, table_schema = build_table_schema(conn, schema_name, table_name)
 
         return dg.MaterializeResult(
-            metadata={
-                "row_count": row_count,
-                "table": fq_table_name,
-                "columns": col_count,
-                "schema": table_schema
-            },
+            metadata={"row_count": row_count, "table": fq_table_name, "columns": col_count, "schema": table_schema},
         )
