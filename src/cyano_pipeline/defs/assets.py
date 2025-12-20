@@ -23,6 +23,9 @@ DUCKDB_CREDENTIALS: DuckDbCredentials = DuckDbCredentials(
 _DLT_DUCKDB_POOL = "duckdb_write"
 
 
+# --- Extract ---
+
+
 @dlt_assets(
     dlt_source=havochvatten_source().with_resources("profiles", "results"),
     dlt_pipeline=dlt.pipeline(
@@ -37,6 +40,9 @@ _DLT_DUCKDB_POOL = "duckdb_write"
 def havochvatten_assets(context: dg.AssetExecutionContext, dlt: DagsterDltResource) -> Iterator[DltEventType]:
     """Loads profiles (SCD2) and results (incremental) from Havochvatten API."""
     yield from dlt.run(context=context)
+
+
+# --- Core layer ---
 
 
 @dg.asset(
@@ -100,3 +106,37 @@ FROM {SCHEMA_RAW_HAVOCHVATTEN}.results;
         return dg.MaterializeResult(
             metadata={"row_count": row_count, "table": fq_table_name, "columns": col_count, "schema": table_schema},
         )
+
+
+# --- Jobs ---
+
+
+profiles_job = dg.define_asset_job(
+    name="profiles_refresh",
+    selection=dg.AssetSelection.assets(
+        "dlt_havochvatten_source_profiles",
+        "dim_bathing_waters",
+    ),
+)
+
+samples_job = dg.define_asset_job(
+    name="samples_refresh",
+    selection=dg.AssetSelection.assets(
+        "dlt_havochvatten_source_results",
+        "fact_water_samples",
+    ),
+)
+
+
+# --- Schedules ---
+
+
+weekly_profiles_schedule = dg.ScheduleDefinition(
+    job=profiles_job,
+    cron_schedule="0 3 * * 0",
+)
+
+daily_samples_schedule = dg.ScheduleDefinition(
+    job=samples_job,
+    cron_schedule="0 2 * * *",
+)
