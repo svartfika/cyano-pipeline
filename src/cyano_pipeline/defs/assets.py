@@ -73,3 +73,38 @@ WHERE _dlt_valid_to IS NULL;
                 "table": fq_table_name,
             },
         )
+
+@dg.asset(
+    deps=["dlt_havochvatten_source_results"],
+    group_name="core_bathing_waters",
+    pool=_DLT_DUCKDB_POOL,
+    kinds={"duckdb"},
+)
+def fact_water_samples(duckdb: DuckDBResource) -> MaterializeResult[Any]:
+    schema = SCHEMA_CORE
+    table = "fact_water_samples"
+    fq_table_name = f"{schema}.{table}"
+
+    query = f"""
+CREATE SCHEMA IF NOT EXISTS {schema};
+
+CREATE OR REPLACE TABLE {fq_table_name} AS
+SELECT
+    _waters_id AS id,
+    taken_at
+
+FROM {SCHEMA_RAW_HAVOCHVATTEN}.results;
+    """
+    with duckdb.get_connection() as conn:
+        _ = conn.execute(query=query)
+
+        row_count = conn.execute(
+            query=f"SELECT COUNT(*) FROM {fq_table_name};",
+        ).fetchone()
+
+        return dg.MaterializeResult(
+            metadata={
+                "row_count": row_count[0] if row_count else None,
+                "table": fq_table_name,
+            },
+        )
