@@ -137,6 +137,41 @@ def dim_bathing_waters(duckdb: DuckDBResource) -> MaterializeResult[Any]:
 
     CREATE OR REPLACE TABLE {fq_table_name} AS
 
+    WITH perimeter_points AS (
+        SELECT 
+            _dlt_parent_id,
+            
+            LIST(
+                ST_Point(
+                    TRY_CAST(longitude AS DOUBLE), 
+                    TRY_CAST(latitude AS DOUBLE)
+                )
+                ORDER BY _dlt_list_idx
+            ) AS points
+
+        FROM {SCHEMA_RAW_HAVOCHVATTEN}.waters__bathing_water__perimeter_coordinates
+
+        WHERE TRY_CAST(longitude AS DOUBLE) IS NOT NULL 
+            AND TRY_CAST(latitude AS DOUBLE) IS NOT NULL
+
+        GROUP BY _dlt_parent_id
+    ),
+
+    perimeter_polygons AS (
+        SELECT 
+            _dlt_parent_id,
+
+            ST_MakePolygon(
+                ST_MakeLine(
+                    list_concat(points, [points[1]])
+                )
+            ) AS perimeter_geom
+
+        FROM perimeter_points
+
+        WHERE len(points) >= 3
+    )
+
     SELECT
         p._waters_id AS id,
         p.bathing_water__name AS name,
@@ -158,6 +193,8 @@ def dim_bathing_waters(duckdb: DuckDBResource) -> MaterializeResult[Any]:
                 TRY_CAST(p.bathing_water__sampling_point_position__latitude AS DOUBLE)
         ) AS sampling_point_geom,
 
+        pp.perimeter_geom,
+
         p._dlt_load_id,
         p._dlt_id
 
@@ -165,6 +202,9 @@ def dim_bathing_waters(duckdb: DuckDBResource) -> MaterializeResult[Any]:
 
     LEFT JOIN {SCHEMA_CORE}.ref_lookup_water_type_id l
         ON p.bathing_water__water_type_id = l.water_type_id
+
+    LEFT JOIN perimeter_polygons pp
+        ON p._dlt_id = pp._dlt_parent_id
 
     WHERE _dlt_valid_to IS NULL
     ;
