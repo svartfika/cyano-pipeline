@@ -47,6 +47,81 @@ def havochvatten_assets(context: dg.AssetExecutionContext, dlt: DagsterDltResour
 
 @dg.asset(
     deps=["dlt_havochvatten_source_profiles"],
+    group_name="core_lookup",
+    pool=_DLT_DUCKDB_POOL,
+    kinds={"duckdb"},
+)
+def ref_lookup_algal_id(duckdb: DuckDBResource) -> MaterializeResult[Any]:
+    schema_name = SCHEMA_CORE
+    table_name = "ref_lookup_algal_id"
+    fq_table_name = f"{schema_name}.{table_name}"
+
+    query = f"""
+CREATE SCHEMA IF NOT EXISTS {schema_name};
+
+CREATE OR REPLACE TABLE {fq_table_name} (
+    algal_id INT PRIMARY KEY,
+    status_code VARCHAR NOT NULL UNIQUE,
+    sort_order INT
+);
+
+INSERT INTO {fq_table_name} VALUES 
+    (3, 'bloom', 1),
+    (4, 'no_bloom', 2),
+    (5, 'no_data', 3)
+;
+    """
+    with duckdb.get_connection() as conn:
+        _ = conn.execute(query=query)
+        row_count = count_table_rows(conn, schema_name, table_name)
+        col_count, table_schema = build_table_schema(conn, schema_name, table_name)
+
+        return dg.MaterializeResult(
+            metadata={"row_count": row_count, "table": fq_table_name, "columns": col_count, "schema": table_schema},
+        )
+
+
+@dg.asset(
+    deps=["dlt_havochvatten_source_profiles"],
+    group_name="core_lookup",
+    pool=_DLT_DUCKDB_POOL,
+    kinds={"duckdb"},
+)
+def ref_lookup_water_type_id(duckdb: DuckDBResource) -> MaterializeResult[Any]:
+    schema_name = SCHEMA_CORE
+    table_name = "ref_lookup_water_type_id"
+    fq_table_name = f"{schema_name}.{table_name}"
+
+    query = f"""
+CREATE SCHEMA IF NOT EXISTS {schema_name};
+
+CREATE OR REPLACE TABLE {fq_table_name} (
+    water_type_id INT PRIMARY KEY,
+    status_code VARCHAR NOT NULL UNIQUE,
+    sort_order INT
+);
+
+INSERT INTO {fq_table_name} VALUES 
+    (1, 'sea', 1),
+    (2, 'river', 2),
+    (3, 'lake', 3),
+    (4, 'delta', 4)
+;
+    """
+    with duckdb.get_connection() as conn:
+        _ = conn.execute(query=query)
+        row_count = count_table_rows(conn, schema_name, table_name)
+        col_count, table_schema = build_table_schema(conn, schema_name, table_name)
+
+        return dg.MaterializeResult(
+            metadata={"row_count": row_count, "table": fq_table_name, "columns": col_count, "schema": table_schema},
+        )
+
+
+@dg.asset(
+    deps=[
+        "dlt_havochvatten_source_profiles",
+    ],
     group_name="core_bathing_waters",
     pool=_DLT_DUCKDB_POOL,
     kinds={"duckdb"},
