@@ -27,7 +27,7 @@ def _flatten_bathing_water_id(record: dict[str, Any]) -> dict[str, Any]:
 def havochvatten_source() -> Iterator[DltResource]:
     """Havochvatten bathing water API source.
     
-    Resources: waters (parent only), profiles (SCD2), results (incremental), forecasts
+    Resources: waters (SCD2, parent, default), profiles (SCD2), results (incremental, default), forecasts
     """
     with throttled_session(requests_per_second=REQUESTS_PER_SECOND) as session:
         rest_config: RESTAPIConfig = {
@@ -40,16 +40,16 @@ def havochvatten_source() -> Iterator[DltResource]:
             "resources": [
                 {
                     "name": "waters",
-                    "selected": False,  # Parent resource to get IDs
+                    "selected": True,  # Current advisories. Parent resource to get IDs, default resource.
                     "endpoint": {"path": "bathing-waters/"},
                     "processing_steps": [
                         {"map": _flatten_bathing_water_id},
                     ],
-                    "write_disposition": "replace",
+                    "write_disposition": {"disposition": "merge", "strategy": "scd2"},
                 },
                 {
                     "name": "profiles",
-                    "selected": False,  # Slowly-changing, select manually
+                    "selected": False,  # Slowly-changing, select manually.
                     "include_from_parent": ["id"],
                     "endpoint": {
                         "path": "bathing-waters/{resources.waters.id}/profiles/",
@@ -59,7 +59,7 @@ def havochvatten_source() -> Iterator[DltResource]:
                 },
                 {
                     "name": "results",
-                    "selected": True,  # Frequent updates, default resource
+                    "selected": True,  # Frequent updates, default resource.
                     "include_from_parent": ["id"],
                     "endpoint": {
                         "path": "bathing-waters/{resources.waters.id}/results/",
@@ -73,7 +73,7 @@ def havochvatten_source() -> Iterator[DltResource]:
                 },
                 {
                     "name": "forecasts",
-                    "selected": False,  # Frequent updates, select manually
+                    "selected": False,  # Frequent updates, select manually.
                     "include_from_parent": ["id"],
                     "endpoint": {
                         "path": "forecasts/",

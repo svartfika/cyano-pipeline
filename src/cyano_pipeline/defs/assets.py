@@ -27,7 +27,7 @@ _DLT_DUCKDB_POOL = "duckdb_write"
 
 
 @dlt_assets(
-    dlt_source=havochvatten_source().with_resources("profiles", "results"),
+    dlt_source=havochvatten_source().with_resources("waters", "profiles", "results"),
     dlt_pipeline=dlt.pipeline(
         pipeline_name="dlt_havochvatten",
         destination=dlt.destinations.duckdb(credentials=DUCKDB_CREDENTIALS),
