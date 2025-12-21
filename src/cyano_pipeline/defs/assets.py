@@ -121,6 +121,7 @@ INSERT INTO {fq_table_name} VALUES
 @dg.asset(
     deps=[
         "dlt_havochvatten_source_profiles",
+        "ref_lookup_water_type_id",
     ],
     group_name="core_bathing_waters",
     pool=_DLT_DUCKDB_POOL,
@@ -132,17 +133,46 @@ def dim_bathing_waters(duckdb: DuckDBResource) -> MaterializeResult[Any]:
     fq_table_name = f"{schema_name}.{table_name}"
 
     query = f"""
-CREATE SCHEMA IF NOT EXISTS {schema_name};
+    CREATE SCHEMA IF NOT EXISTS {schema_name};
 
-CREATE OR REPLACE TABLE {fq_table_name} AS
-SELECT
-    _waters_id AS id,
-    bathing_water__name AS name
+    CREATE OR REPLACE TABLE {fq_table_name} AS
 
-FROM {SCHEMA_RAW_HAVOCHVATTEN}.profiles
-WHERE _dlt_valid_to IS NULL;
+    SELECT
+        p._waters_id AS id,
+        p.bathing_water__name AS name,
+
+        l.water_type_id,
+        l.status_code AS water_type_status_code,
+
+        p.algae AS algae_bloom_risk,
+        p.cyano AS cyanobacteria_risk,
+
+        p.bathing_season__starts_at AS season_start,
+        p.bathing_season__ends_at AS season_end,
+
+        TRY_CAST(p.bathing_water__sampling_point_position__longitude AS DOUBLE) AS sampling_point_lon,
+        TRY_CAST(p.bathing_water__sampling_point_position__latitude AS DOUBLE) AS sampling_point_lat,
+        
+        ST_Point(
+                TRY_CAST(p.bathing_water__sampling_point_position__longitude AS DOUBLE),
+                TRY_CAST(p.bathing_water__sampling_point_position__latitude AS DOUBLE)
+        ) AS sampling_point_geom,
+
+        p._dlt_load_id,
+        p._dlt_id
+
+    FROM {SCHEMA_RAW_HAVOCHVATTEN}.profiles p
+
+    LEFT JOIN {SCHEMA_CORE}.ref_lookup_water_type_id l
+        ON p.bathing_water__water_type_id = l.water_type_id
+
+    WHERE _dlt_valid_to IS NULL
+    ;
     """
     with duckdb.get_connection() as conn:
+        conn.install_extension(extension="spatial")
+        conn.load_extension(extension="spatial")
+
         _ = conn.execute(query=query)
         row_count = count_table_rows(conn, schema_name, table_name)
         col_count, table_schema = build_table_schema(conn, schema_name, table_name)
