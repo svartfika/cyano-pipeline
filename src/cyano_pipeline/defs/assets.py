@@ -183,7 +183,10 @@ def dim_bathing_waters(duckdb: DuckDBResource) -> MaterializeResult[Any]:
 
 
 @dg.asset(
-    deps=["dlt_havochvatten_source_results"],
+    deps=[
+        "dlt_havochvatten_source_results",
+        "ref_lookup_algal_id",
+    ],
     group_name="core_bathing_waters",
     pool=_DLT_DUCKDB_POOL,
     kinds={"duckdb"},
@@ -194,14 +197,25 @@ def fact_water_samples(duckdb: DuckDBResource) -> MaterializeResult[Any]:
     fq_table_name = f"{schema_name}.{table_name}"
 
     query = f"""
-CREATE SCHEMA IF NOT EXISTS {schema_name};
+    CREATE SCHEMA IF NOT EXISTS {schema_name};
 
-CREATE OR REPLACE TABLE {fq_table_name} AS
-SELECT
-    _waters_id AS id,
-    taken_at
+    CREATE OR REPLACE TABLE {fq_table_name} AS
 
-FROM {SCHEMA_RAW_HAVOCHVATTEN}.results;
+    SELECT
+        r._waters_id AS id,
+        l.algal_id,
+        l.status_code AS algal_status_code,
+        r.water_temp,
+        r.taken_at,
+
+        r._dlt_load_id,
+        r._dlt_id
+
+    FROM {SCHEMA_RAW_HAVOCHVATTEN}.results r
+
+    LEFT JOIN {SCHEMA_CORE}.ref_lookup_algal_id l
+        ON r.algal_id = l.algal_id
+    ;
     """
     with duckdb.get_connection() as conn:
         _ = conn.execute(query=query)
