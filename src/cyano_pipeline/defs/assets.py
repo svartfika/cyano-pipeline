@@ -256,6 +256,8 @@ def dim_bathing_waters(duckdb: DuckDBResource) -> MaterializeResult[Any]:
         p._waters_id AS id,
         p.bathing_water__name AS name,
 
+        p.bathing_water__eu_type AS is_eu_designated,
+
         l.water_type_id,
         l.status_code AS water_type_status_code,
 
@@ -265,6 +267,15 @@ def dim_bathing_waters(duckdb: DuckDBResource) -> MaterializeResult[Any]:
         p.bathing_season__starts_at AS season_start,
         p.bathing_season__ends_at AS season_end,
 
+        EXTRACT(WEEK FROM p.bathing_season__starts_at)::INTEGER AS season_start_week,
+        EXTRACT(WEEK FROM p.bathing_season__ends_at)::INTEGER AS season_end_week,
+
+        DATEDIFF('day',
+            p.bathing_season__starts_at,
+            p.bathing_season__ends_at
+        ) + 1 AS season_duration_days,
+
+        TRIM(p.bathing_water__municipality__name) AS municipality_raw,
         m.municipality,
         m.county,
         m.county_name,
