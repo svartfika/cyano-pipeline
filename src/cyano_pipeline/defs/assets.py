@@ -87,6 +87,40 @@ def ref_municipalities(duckdb: DuckDBResource) -> MaterializeResult[Any]:
         )
 
 
+@dg.asset(
+    deps=["ref_municipalities"],
+    group_name="core_seed",
+    pool=_DLT_DUCKDB_POOL,
+    kinds={"duckdb"},
+)
+def ref_municipality_aliases(duckdb: DuckDBResource) -> MaterializeResult[Any]:
+    schema_name = SCHEMA_CORE
+    table_name = "ref_municipality_aliases"
+    fq_table_name = f"{schema_name}.{table_name}"
+
+    query = f"""
+    CREATE OR REPLACE TABLE {fq_table_name} (
+        source_name VARCHAR PRIMARY KEY,
+        canonical_name VARCHAR NOT NULL
+    );
+
+    INSERT INTO {fq_table_name} VALUES 
+        ('Malung', 'Malung-Sälen'),
+        ('Upplands-Väsby', 'Upplands Väsby')
+    ;
+    """
+    with duckdb.get_connection() as conn:
+        ensure_schema(conn, schema_name)
+        _ = conn.execute(query=query)
+
+        row_count = count_table_rows(conn, schema_name, table_name)
+        col_count, table_schema = build_table_schema(conn, schema_name, table_name)
+
+        return dg.MaterializeResult(
+            metadata={"row_count": row_count, "table": fq_table_name, "columns": col_count, "schema": table_schema},
+        )
+
+
 # --- Lookup ---
 
 
