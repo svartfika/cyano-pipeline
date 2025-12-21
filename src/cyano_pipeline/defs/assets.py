@@ -11,7 +11,7 @@ from dlt.destinations.impl.duckdb.configuration import DuckDbCredentials
 
 from cyano_pipeline.defs.dlt.sources.havochvatten import havochvatten_source
 from cyano_pipeline.defs.resources import DUCKDB_PATH
-from cyano_pipeline.defs.utils import build_table_schema, count_table_rows
+from cyano_pipeline.defs.utils import build_table_schema, count_table_rows, ensure_schema
 
 SCHEMA_RAW_HAVOCHVATTEN = "raw_havochvatten"
 SCHEMA_CORE = "core"
@@ -46,7 +46,6 @@ def havochvatten_assets(context: dg.AssetExecutionContext, dlt: DagsterDltResour
 
 
 @dg.asset(
-    deps=["dlt_havochvatten_source_profiles"],
     group_name="core_lookup",
     pool=_DLT_DUCKDB_POOL,
     kinds={"duckdb"},
@@ -57,22 +56,22 @@ def ref_lookup_algal_id(duckdb: DuckDBResource) -> MaterializeResult[Any]:
     fq_table_name = f"{schema_name}.{table_name}"
 
     query = f"""
-CREATE SCHEMA IF NOT EXISTS {schema_name};
+    CREATE OR REPLACE TABLE {fq_table_name} (
+        algal_id INT PRIMARY KEY,
+        status_code VARCHAR NOT NULL UNIQUE,
+        sort_order INT
+    );
 
-CREATE OR REPLACE TABLE {fq_table_name} (
-    algal_id INT PRIMARY KEY,
-    status_code VARCHAR NOT NULL UNIQUE,
-    sort_order INT
-);
-
-INSERT INTO {fq_table_name} VALUES 
-    (3, 'bloom', 1),
-    (4, 'no_bloom', 2),
-    (5, 'no_data', 3)
-;
+    INSERT INTO {fq_table_name} VALUES 
+        (3, 'bloom', 1),
+        (4, 'no_bloom', 2),
+        (5, 'no_data', 3)
+    ;
     """
     with duckdb.get_connection() as conn:
+        ensure_schema(conn, schema_name)
         _ = conn.execute(query=query)
+
         row_count = count_table_rows(conn, schema_name, table_name)
         col_count, table_schema = build_table_schema(conn, schema_name, table_name)
 
@@ -82,7 +81,6 @@ INSERT INTO {fq_table_name} VALUES
 
 
 @dg.asset(
-    deps=["dlt_havochvatten_source_profiles"],
     group_name="core_lookup",
     pool=_DLT_DUCKDB_POOL,
     kinds={"duckdb"},
@@ -93,23 +91,23 @@ def ref_lookup_water_type_id(duckdb: DuckDBResource) -> MaterializeResult[Any]:
     fq_table_name = f"{schema_name}.{table_name}"
 
     query = f"""
-CREATE SCHEMA IF NOT EXISTS {schema_name};
+    CREATE OR REPLACE TABLE {fq_table_name} (
+        water_type_id INT PRIMARY KEY,
+        status_code VARCHAR NOT NULL UNIQUE,
+        sort_order INT
+    );
 
-CREATE OR REPLACE TABLE {fq_table_name} (
-    water_type_id INT PRIMARY KEY,
-    status_code VARCHAR NOT NULL UNIQUE,
-    sort_order INT
-);
-
-INSERT INTO {fq_table_name} VALUES 
-    (1, 'sea', 1),
-    (2, 'river', 2),
-    (3, 'lake', 3),
-    (4, 'delta', 4)
-;
+    INSERT INTO {fq_table_name} VALUES 
+        (1, 'sea', 1),
+        (2, 'river', 2),
+        (3, 'lake', 3),
+        (4, 'delta', 4)
+    ;
     """
     with duckdb.get_connection() as conn:
+        ensure_schema(conn, schema_name)
         _ = conn.execute(query=query)
+
         row_count = count_table_rows(conn, schema_name, table_name)
         col_count, table_schema = build_table_schema(conn, schema_name, table_name)
 
@@ -133,8 +131,6 @@ def dim_bathing_waters(duckdb: DuckDBResource) -> MaterializeResult[Any]:
     fq_table_name = f"{schema_name}.{table_name}"
 
     query = f"""
-    CREATE SCHEMA IF NOT EXISTS {schema_name};
-
     CREATE OR REPLACE TABLE {fq_table_name} AS
 
     WITH perimeter_points AS (
@@ -220,7 +216,9 @@ def dim_bathing_waters(duckdb: DuckDBResource) -> MaterializeResult[Any]:
         conn.install_extension(extension="spatial")
         conn.load_extension(extension="spatial")
 
+        ensure_schema(conn, schema_name)
         _ = conn.execute(query=query)
+
         row_count = count_table_rows(conn, schema_name, table_name)
         col_count, table_schema = build_table_schema(conn, schema_name, table_name)
 
@@ -244,8 +242,6 @@ def fact_water_samples(duckdb: DuckDBResource) -> MaterializeResult[Any]:
     fq_table_name = f"{schema_name}.{table_name}"
 
     query = f"""
-    CREATE SCHEMA IF NOT EXISTS {schema_name};
-
     CREATE OR REPLACE TABLE {fq_table_name} AS
 
     SELECT
@@ -265,7 +261,9 @@ def fact_water_samples(duckdb: DuckDBResource) -> MaterializeResult[Any]:
     ;
     """
     with duckdb.get_connection() as conn:
+        ensure_schema(conn, schema_name)
         _ = conn.execute(query=query)
+
         row_count = count_table_rows(conn, schema_name, table_name)
         col_count, table_schema = build_table_schema(conn, schema_name, table_name)
 

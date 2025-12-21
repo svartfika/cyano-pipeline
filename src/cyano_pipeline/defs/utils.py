@@ -2,6 +2,10 @@ from dagster import TableColumn, TableSchema
 from duckdb import DuckDBPyConnection
 
 
+def ensure_schema(conn: DuckDBPyConnection, schema_name: str) -> None:
+    _ = conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
+
+
 def count_table_rows(conn: DuckDBPyConnection, schema_name: str, table_name: str) -> int | None:
     """Get the row count for a table (fully qualified table name)."""
     fq_table_name = f"{schema_name}.{table_name}"
