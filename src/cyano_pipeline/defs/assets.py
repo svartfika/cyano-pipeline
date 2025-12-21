@@ -346,10 +346,21 @@ def fact_water_samples(duckdb: DuckDBResource) -> MaterializeResult[Any]:
 
     SELECT
         r._waters_id AS id,
+
+        r.taken_at,
+
+        r.taken_at::DATE AS sample_date,
+        EXTRACT(YEAR FROM r.taken_at)::INTEGER AS sample_year,
+        EXTRACT(MONTH FROM r.taken_at)::INTEGER AS sample_month,
+        EXTRACT(WEEK FROM r.taken_at)::INTEGER AS sample_week,
+
         l.algal_id,
         l.status_code AS algal_status_code,
-        r.water_temp,
-        r.taken_at,
+
+        (r.algal_id IS NOT NULL AND r.algal_id IN (3, 4)) AS has_algae_data,
+        (r.algal_id = 3) AS is_bloom,
+
+        TRY_CAST(r.water_temp AS DOUBLE) AS water_temp,
 
         r._dlt_load_id,
         r._dlt_id
