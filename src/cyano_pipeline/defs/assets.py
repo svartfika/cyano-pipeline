@@ -93,9 +93,9 @@ def ref_municipalities(duckdb: DuckDBResource) -> MaterializeResult[Any]:
     pool=_DLT_DUCKDB_POOL,
     kinds={"duckdb"},
 )
-def ref_municipality_aliases(duckdb: DuckDBResource) -> MaterializeResult[Any]:
+def ref_municipalities_aliases(duckdb: DuckDBResource) -> MaterializeResult[Any]:
     schema_name = SCHEMA_CORE
-    table_name = "ref_municipality_aliases"
+    table_name = "ref_municipalities_aliases"
     fq_table_name = f"{schema_name}.{table_name}"
 
     query = f"""
@@ -202,6 +202,8 @@ def ref_lookup_water_type_id(duckdb: DuckDBResource) -> MaterializeResult[Any]:
     deps=[
         "dlt_havochvatten_source_profiles",
         "ref_lookup_water_type_id",
+        "ref_municipalities_aliases",
+        "ref_municipalities",
     ],
     group_name="core_bathing_waters",
     pool=_DLT_DUCKDB_POOL,
@@ -263,7 +265,12 @@ def dim_bathing_waters(duckdb: DuckDBResource) -> MaterializeResult[Any]:
         p.bathing_season__starts_at AS season_start,
         p.bathing_season__ends_at AS season_end,
 
-        p.bathing_water__municipality__name AS municipality,
+        m.municipality,
+        m.county,
+        m.county_name,
+        m.land,
+        m.nuts1_name,
+        m.nuts2_name,
 
         TRY_CAST(p.bathing_water__sampling_point_position__longitude AS DOUBLE) AS sampling_point_lon,
         TRY_CAST(p.bathing_water__sampling_point_position__latitude AS DOUBLE) AS sampling_point_lat,
@@ -289,6 +296,12 @@ def dim_bathing_waters(duckdb: DuckDBResource) -> MaterializeResult[Any]:
 
     LEFT JOIN {SCHEMA_CORE}.ref_lookup_water_type_id l
         ON p.bathing_water__water_type_id = l.water_type_id
+
+    LEFT JOIN {SCHEMA_CORE}.ref_municipalities_aliases a
+        ON TRIM(p.bathing_water__municipality__name) = a.source_name
+
+    LEFT JOIN {SCHEMA_CORE}.ref_municipalities m
+        ON COALESCE(a.canonical_name, TRIM(p.bathing_water__municipality__name)) = m.municipality
 
     LEFT JOIN perimeter_polygons pp
         ON p._dlt_id = pp._dlt_parent_id
