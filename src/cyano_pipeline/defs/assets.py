@@ -188,10 +188,17 @@ def dim_bathing_waters(duckdb: DuckDBResource) -> MaterializeResult[Any]:
         TRY_CAST(p.bathing_water__sampling_point_position__longitude AS DOUBLE) AS sampling_point_lon,
         TRY_CAST(p.bathing_water__sampling_point_position__latitude AS DOUBLE) AS sampling_point_lat,
         
-        ST_Point(
+        CASE 
+            WHEN TRY_CAST(p.bathing_water__sampling_point_position__longitude AS DOUBLE) IS NOT NULL
+                AND TRY_CAST(p.bathing_water__sampling_point_position__latitude AS DOUBLE) IS NOT NULL
+            
+            THEN ST_Point(
                 TRY_CAST(p.bathing_water__sampling_point_position__longitude AS DOUBLE),
                 TRY_CAST(p.bathing_water__sampling_point_position__latitude AS DOUBLE)
-        ) AS sampling_point_geom,
+            )
+
+            ELSE NULL
+        END AS sampling_point_geom,
 
         pp.perimeter_geom,
 
