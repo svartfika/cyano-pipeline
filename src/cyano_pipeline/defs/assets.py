@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import dagster as dg
@@ -12,6 +13,8 @@ from dlt.destinations.impl.duckdb.configuration import DuckDbCredentials
 from cyano_pipeline.defs.dlt.sources.havochvatten import havochvatten_source
 from cyano_pipeline.defs.resources import DUCKDB_PATH
 from cyano_pipeline.defs.utils import build_table_schema, count_table_rows, ensure_schema
+
+PATH_SEED: Path = Path("seed")
 
 SCHEMA_RAW_HAVOCHVATTEN = "raw_havochvatten"
 SCHEMA_CORE = "core"
@@ -43,6 +46,48 @@ def havochvatten_assets(context: dg.AssetExecutionContext, dlt: DagsterDltResour
 
 
 # --- Core layer ---
+
+# --- Seed ---
+
+
+@dg.asset(
+    group_name="core_seed",
+    pool=_DLT_DUCKDB_POOL,
+    kinds={"duckdb"},
+)
+def ref_municipalities(duckdb: DuckDBResource) -> MaterializeResult[Any]:
+    schema_name = SCHEMA_CORE
+    table_name = "ref_municipalities"
+    fq_table_name = f"{schema_name}.{table_name}"
+
+    path_csv: Path = PATH_SEED / "municipality_master_2025.csv"
+
+    query = f"""
+    CREATE OR REPLACE TABLE {fq_table_name} AS
+
+    SELECT
+        municipality,
+        county,
+        county_name,
+        land,
+        nuts1_name,
+        nuts2_name
+    FROM read_csv_auto('{path_csv}', header=true)
+    ;
+    """
+    with duckdb.get_connection() as conn:
+        ensure_schema(conn, schema_name)
+        _ = conn.execute(query=query)
+
+        row_count = count_table_rows(conn, schema_name, table_name)
+        col_count, table_schema = build_table_schema(conn, schema_name, table_name)
+
+        return dg.MaterializeResult(
+            metadata={"row_count": row_count, "table": fq_table_name, "columns": col_count, "schema": table_schema},
+        )
+
+
+# --- Lookup ---
 
 
 @dg.asset(
@@ -116,6 +161,9 @@ def ref_lookup_water_type_id(duckdb: DuckDBResource) -> MaterializeResult[Any]:
         )
 
 
+# --- Dim ---
+
+
 @dg.asset(
     deps=[
         "dlt_havochvatten_source_profiles",
@@ -181,6 +229,8 @@ def dim_bathing_waters(duckdb: DuckDBResource) -> MaterializeResult[Any]:
         p.bathing_season__starts_at AS season_start,
         p.bathing_season__ends_at AS season_end,
 
+        p.bathing_water__municipality__name AS municipality,
+
         TRY_CAST(p.bathing_water__sampling_point_position__longitude AS DOUBLE) AS sampling_point_lon,
         TRY_CAST(p.bathing_water__sampling_point_position__latitude AS DOUBLE) AS sampling_point_lat,
         
@@ -225,6 +275,9 @@ def dim_bathing_waters(duckdb: DuckDBResource) -> MaterializeResult[Any]:
         return dg.MaterializeResult(
             metadata={"row_count": row_count, "table": fq_table_name, "columns": col_count, "schema": table_schema},
         )
+
+
+# --- Fact ---
 
 
 @dg.asset(
