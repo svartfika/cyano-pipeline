@@ -4,7 +4,6 @@ from typing import Any
 
 import dagster as dg
 import dlt
-from dagster._core.definitions.result import MaterializeResult
 from dagster_dlt import DagsterDltResource, dlt_assets
 from dagster_dlt.dlt_event_iterator import DltEventType
 from dagster_duckdb import DuckDBResource
@@ -56,7 +55,7 @@ def havochvatten_assets(context: dg.AssetExecutionContext, dlt: DagsterDltResour
     pool=_DLT_DUCKDB_POOL,
     kinds={"duckdb"},
 )
-def ref_municipalities(duckdb: DuckDBResource) -> MaterializeResult[Any]:
+def ref_municipalities(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
     schema_name = SCHEMA_CORE
     table_name = "ref_municipalities"
     fq_table_name = f"{schema_name}.{table_name}"
@@ -89,7 +88,7 @@ def ref_municipalities(duckdb: DuckDBResource) -> MaterializeResult[Any]:
     pool=_DLT_DUCKDB_POOL,
     kinds={"duckdb"},
 )
-def ref_municipalities_aliases(duckdb: DuckDBResource) -> MaterializeResult[Any]:
+def ref_municipalities_aliases(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
     schema_name = SCHEMA_CORE
     table_name = "ref_municipalities_aliases"
     fq_table_name = f"{schema_name}.{table_name}"
@@ -120,7 +119,7 @@ def ref_municipalities_aliases(duckdb: DuckDBResource) -> MaterializeResult[Any]
     pool=_DLT_DUCKDB_POOL,
     kinds={"duckdb"},
 )
-def ref_lookup_algal_id(duckdb: DuckDBResource) -> MaterializeResult[Any]:
+def ref_lookup_algal_id(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
     schema_name = SCHEMA_CORE
     table_name = "ref_lookup_algal_id"
     fq_table_name = f"{schema_name}.{table_name}"
@@ -150,7 +149,7 @@ def ref_lookup_algal_id(duckdb: DuckDBResource) -> MaterializeResult[Any]:
     pool=_DLT_DUCKDB_POOL,
     kinds={"duckdb"},
 )
-def ref_lookup_water_type_id(duckdb: DuckDBResource) -> MaterializeResult[Any]:
+def ref_lookup_water_type_id(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
     schema_name = SCHEMA_CORE
     table_name = "ref_lookup_water_type_id"
     fq_table_name = f"{schema_name}.{table_name}"
@@ -188,7 +187,7 @@ def ref_lookup_water_type_id(duckdb: DuckDBResource) -> MaterializeResult[Any]:
     pool=_DLT_DUCKDB_POOL,
     kinds={"duckdb"},
 )
-def ref_effective_season_bounds(duckdb: DuckDBResource) -> MaterializeResult[Any]:
+def ref_effective_season_bounds(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
     schema_name = SCHEMA_CORE
     table_name = "ref_effective_season_bounds"
     fq_table_name = f"{schema_name}.{table_name}"
@@ -273,7 +272,7 @@ def ref_effective_season_bounds(duckdb: DuckDBResource) -> MaterializeResult[Any
     pool=_DLT_DUCKDB_POOL,
     kinds={"duckdb"},
 )
-def dim_bathing_waters(duckdb: DuckDBResource) -> MaterializeResult[Any]:
+def dim_bathing_waters(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
     schema_name = SCHEMA_CORE
     table_name = "dim_bathing_waters"
     fq_table_name = f"{schema_name}.{table_name}"
@@ -406,7 +405,7 @@ def dim_bathing_waters(duckdb: DuckDBResource) -> MaterializeResult[Any]:
     pool=_DLT_DUCKDB_POOL,
     kinds={"duckdb"},
 )
-def fact_water_samples(duckdb: DuckDBResource) -> MaterializeResult[Any]:
+def fact_water_samples(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
     schema_name = SCHEMA_CORE
     table_name = "fact_water_samples"
     fq_table_name = f"{schema_name}.{table_name}"
@@ -463,7 +462,7 @@ def fact_water_samples(duckdb: DuckDBResource) -> MaterializeResult[Any]:
     pool=_DLT_DUCKDB_POOL,
     kinds={"duckdb"},
 )
-def mart_weekly_bloom_metrics(duckdb: DuckDBResource) -> MaterializeResult[Any]:
+def mart_weekly_bloom_metrics(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
     schema_name = SCHEMA_MART
     table_name = "mart_weekly_bloom_metrics"
     fq_table_name = f"{schema_name}.{table_name}"
@@ -539,37 +538,3 @@ def mart_weekly_bloom_metrics(duckdb: DuckDBResource) -> MaterializeResult[Any]:
         _ = conn.execute(query=query)
 
         return build_materialize_result(conn, schema_name, table_name)
-
-
-# --- Jobs ---
-
-
-profiles_job = dg.define_asset_job(
-    name="profiles_refresh",
-    selection=dg.AssetSelection.assets(
-        "dlt_havochvatten_source_profiles",
-        "dim_bathing_waters",
-    ),
-)
-
-samples_job = dg.define_asset_job(
-    name="samples_refresh",
-    selection=dg.AssetSelection.assets(
-        "dlt_havochvatten_source_results",
-        "fact_water_samples",
-    ),
-)
-
-
-# --- Schedules ---
-
-
-weekly_profiles_schedule = dg.ScheduleDefinition(
-    job=profiles_job,
-    cron_schedule="0 3 * * 0",
-)
-
-daily_samples_schedule = dg.ScheduleDefinition(
-    job=samples_job,
-    cron_schedule="0 2 * * *",
-)
