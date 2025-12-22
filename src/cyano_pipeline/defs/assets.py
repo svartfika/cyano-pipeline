@@ -12,7 +12,7 @@ from dlt.destinations.impl.duckdb.configuration import DuckDbCredentials
 
 from cyano_pipeline.defs.dlt.sources.havochvatten import havochvatten_source
 from cyano_pipeline.defs.resources import DUCKDB_PATH
-from cyano_pipeline.defs.utils import build_materialize_result, build_table_schema, count_table_rows, ensure_schema
+from cyano_pipeline.defs.utils import build_materialize_result, ensure_schema
 
 PATH_SEED: Path = Path("seed")
 
@@ -79,12 +79,7 @@ def ref_municipalities(duckdb: DuckDBResource) -> MaterializeResult[Any]:
         ensure_schema(conn, schema_name)
         _ = conn.execute(query=query)
 
-        row_count = count_table_rows(conn, schema_name, table_name)
-        col_count, table_schema = build_table_schema(conn, schema_name, table_name)
-
-        return dg.MaterializeResult(
-            metadata={"row_count": row_count, "table": fq_table_name, "columns": col_count, "schema": table_schema},
-        )
+        return build_materialize_result(conn, schema_name, table_name)
 
 
 @dg.asset(
@@ -113,12 +108,7 @@ def ref_municipalities_aliases(duckdb: DuckDBResource) -> MaterializeResult[Any]
         ensure_schema(conn, schema_name)
         _ = conn.execute(query=query)
 
-        row_count = count_table_rows(conn, schema_name, table_name)
-        col_count, table_schema = build_table_schema(conn, schema_name, table_name)
-
-        return dg.MaterializeResult(
-            metadata={"row_count": row_count, "table": fq_table_name, "columns": col_count, "schema": table_schema},
-        )
+        return build_materialize_result(conn, schema_name, table_name)
 
 
 # --- Lookup ---
