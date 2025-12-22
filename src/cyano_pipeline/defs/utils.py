@@ -1,4 +1,7 @@
-from dagster import TableColumn, TableSchema
+from collections.abc import Mapping, Sequence
+from typing import Any
+
+import dagster as dg
 from duckdb import DuckDBPyConnection
 
 
@@ -17,7 +20,7 @@ def count_table_rows(conn: DuckDBPyConnection, schema_name: str, table_name: str
     return row_count[0] if row_count else None
 
 
-def build_table_schema(conn: DuckDBPyConnection, schema_name: str, table_name: str) -> tuple[int, TableSchema]:
+def build_table_schema(conn: DuckDBPyConnection, schema_name: str, table_name: str) -> tuple[int, dg.TableSchema]:
     """Build a TableSchema object from database column metadata."""
     query = """
 SELECT column_name, data_type
@@ -32,9 +35,9 @@ ORDER BY ordinal_position
         parameters=[schema_name, table_name],
     ).fetchall()
 
-    table_schema = TableSchema(
+    table_schema = dg.TableSchema(
         columns=[
-            TableColumn(
+            dg.TableColumn(
                 name=col[0],
                 type=col[1],
             )
@@ -43,3 +46,32 @@ ORDER BY ordinal_position
     )
 
     return len(schema_info), table_schema
+
+
+def build_materialize_result(
+    conn: DuckDBPyConnection,
+    schema_name: str,
+    table_name: str,
+    *,
+    tags: Mapping[str, str] | None = None,
+    check_results: Sequence[dg.AssetCheckResult] | None = None,
+    **extra_metadata: Any,
+) -> dg.MaterializeResult[Any]:
+    """Build standardized MaterializeResult with table metadata, tags and AssetCheckResult."""
+    fq_table_name = f"{schema_name}.{table_name}"
+
+    col_count, table_schema = build_table_schema(conn, schema_name, table_name)
+
+    metadata = {
+        "row_count": count_table_rows(conn, schema_name, table_name),
+        "table": fq_table_name,
+        "columns": col_count,
+        "schema": table_schema,
+        **extra_metadata,
+    }
+
+    return dg.MaterializeResult(
+        metadata=metadata,
+        tags=tags,
+        check_results=check_results,
+    )
