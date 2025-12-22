@@ -185,6 +185,89 @@ def ref_lookup_water_type_id(duckdb: DuckDBResource) -> MaterializeResult[Any]:
         return build_materialize_result(conn, schema_name, table_name)
 
 
+# --- Ref ---
+
+
+@dg.asset(
+    deps=[
+        "fact_water_samples",
+        "dim_bathing_waters",
+    ],
+    group_name="core_bathing_waters",
+    pool=_DLT_DUCKDB_POOL,
+    kinds={"duckdb"},
+)
+def ref_effective_season_bounds(duckdb: DuckDBResource) -> MaterializeResult[Any]:
+    schema_name = SCHEMA_CORE
+    table_name = "ref_effective_season_bounds"
+    fq_table_name = f"{schema_name}.{table_name}"
+
+    query = f"""
+    CREATE OR REPLACE TABLE {fq_table_name} AS
+
+    WITH sample_percentiles AS (
+        SELECT
+            d.nuts2_name,
+            d.water_type_status_code,
+
+            PERCENTILE_CONT(0.10) WITHIN GROUP (ORDER BY f.sample_week)::INTEGER AS p10_week,
+            PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY f.sample_week)::INTEGER AS p90_week,
+
+            COUNT(*) AS n_samples
+
+        FROM {SCHEMA_CORE}.fact_water_samples f
+
+        INNER JOIN {SCHEMA_CORE}.dim_bathing_waters d
+            ON f.id = d.id
+
+        WHERE f.has_algae_data
+
+        GROUP BY d.nuts2_name, d.water_type_status_code
+    ),
+
+    bloom_extent AS (
+        SELECT
+            d.nuts2_name,
+            d.water_type_status_code,
+
+            MAX(f.sample_week) FILTER (WHERE f.is_bloom) AS latest_bloom_week
+
+        FROM {SCHEMA_CORE}.fact_water_samples f
+
+        INNER JOIN {SCHEMA_CORE}.dim_bathing_waters d
+            ON f.id = d.id
+
+        WHERE f.has_algae_data
+
+        GROUP BY d.nuts2_name, d.water_type_status_code
+    )
+
+    SELECT
+        sp.nuts2_name,
+        sp.water_type_status_code,
+        sp.p10_week AS effective_start_week,
+
+        GREATEST(
+            sp.p90_week,
+            COALESCE(be.latest_bloom_week, sp.p90_week)
+            ) + 1 AS effective_end_week,
+
+        sp.n_samples
+
+    FROM sample_percentiles sp
+
+    LEFT JOIN bloom_extent be 
+        ON sp.nuts2_name = be.nuts2_name 
+        AND sp.water_type_status_code = be.water_type_status_code
+    ;
+    """
+    with duckdb.get_connection() as conn:
+        ensure_schema(conn, schema_name)
+        _ = conn.execute(query=query)
+
+        return build_materialize_result(conn, schema_name, table_name)
+
+
 # --- Dim ---
 
 
