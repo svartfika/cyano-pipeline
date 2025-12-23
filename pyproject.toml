@@ -22,6 +22,7 @@ dependencies = [
 dev = [
     "altair[all]>=6.0.0",
     "basedpyright>=1.36.1",
+    "leafmap>=0.57.10",
     "marimo[sql]>=0.18.4",
     "pytest>=9.0.2",
     "pyzmq>=27.1.0",
