@@ -23,14 +23,14 @@ def _():
 
     conn = duckdb.connect(
         database=str(get_root() / DUCKDB_PATH),
-        read_only=False,
+        read_only=True,
     )
     return (conn,)
 
 
 @app.cell
 def _(conn, mo):
-    df_conn = mo.sql(
+    rel_algae = mo.sql(
         f"""
         SELECT * FROM mart.mart_weekly_bloom_metrics
 
@@ -40,22 +40,24 @@ def _(conn, mo):
         output=False,
         engine=conn
     )
-    return (df_conn,)
+    return (rel_algae,)
 
 
 @app.cell
-def _(df_conn):
-    df = df_conn.df()
+def _(rel_algae):
+    df_algae = rel_algae.df()
 
-    df["water_type"] = df["water_type"].str.capitalize()
-    return (df,)
+    df_algae["water_type"] = df_algae["water_type"].str.capitalize()
+
+    df_algae.sample(10)
+    return (df_algae,)
 
 
 @app.cell
-def _(df):
+def _(df_algae):
     import altair as alt
 
-    base = alt.Chart(df).encode(
+    base = alt.Chart(df_algae).encode(
         alt.X("week", type="ordinal").axis(labelAngle=0).title("Week"),
         alt.Y("region", type="ordinal").sort("-x").title("Region"),
     )
