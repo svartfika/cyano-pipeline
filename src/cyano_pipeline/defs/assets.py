@@ -477,44 +477,45 @@ def int_effective_season_bounds(duckdb: DuckDBResource) -> dg.MaterializeResult[
             ON f.id = d.id
 
         WHERE f.has_algae_data
+            OR f.has_bacteria_data
 
         GROUP BY d.nuts2_name, d.water_type_status_code
     ),
 
-    bloom_extent AS (
+    event_extent AS (
         SELECT
             d.nuts2_name,
             d.water_type_status_code,
 
-            MAX(f.sample_week) FILTER (WHERE f.is_bloom) AS latest_bloom_week
-
+            MAX(f.sample_week) FILTER (WHERE f.is_bloom) AS latest_bloom_week,
+            MAX(f.sample_week) FILTER (WHERE f.is_bacteria_fail) AS latest_bacteria_fail_week
+        
         FROM {SCHEMA_CORE}.fact_water_samples f
-
+        
         INNER JOIN {SCHEMA_CORE}.dim_bathing_waters d
             ON f.id = d.id
-
-        WHERE f.has_algae_data
-
+        
         GROUP BY d.nuts2_name, d.water_type_status_code
     )
 
     SELECT
         sp.nuts2_name,
         sp.water_type_status_code,
-        sp.p10_week AS effective_start_week,
 
+        sp.p10_week AS effective_start_week,
         GREATEST(
             sp.p90_week,
-            COALESCE(be.latest_bloom_week, sp.p90_week)
-            ) + 1 AS effective_end_week,
+            COALESCE(ee.latest_bloom_week, 0),
+            COALESCE(ee.latest_bacteria_fail_week, 0)
+        ) + 1 AS effective_end_week,
 
         sp.n_samples
 
     FROM sample_percentiles sp
 
-    LEFT JOIN bloom_extent be 
-        ON sp.nuts2_name = be.nuts2_name 
-        AND sp.water_type_status_code = be.water_type_status_code
+    LEFT JOIN event_extent ee 
+        ON sp.nuts2_name = ee.nuts2_name 
+        AND sp.water_type_status_code = ee.water_type_status_code
     ;
     """
     with duckdb.get_connection() as conn:
