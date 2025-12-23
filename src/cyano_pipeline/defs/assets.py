@@ -540,6 +540,107 @@ def int_effective_season_bounds(duckdb: DuckDBResource) -> dg.MaterializeResult[
     pool=_DLT_DUCKDB_POOL,
     kinds={"duckdb"},
 )
+def mart_weekly_bacteria_metrics(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
+    schema_name = SCHEMA_MART
+    table_name = "mart_weekly_bacteria_metrics"
+    fq_table_name = f"{schema_name}.{table_name}"
+
+    query = f"""
+    CREATE OR REPLACE TABLE {fq_table_name} AS
+
+    WITH weekly_data AS (
+        SELECT
+            d.nuts2_name,
+            d.water_type_status_code,
+            f.sample_week,
+            COUNT(*) AS n_samples,
+            COUNT(*) FILTER (WHERE f.is_bacteria_fail) AS n_fails,
+            COUNT(*) FILTER (WHERE f.is_bacteria_warning) AS n_warnings,
+            COUNT(DISTINCT d.id) AS n_locations
+
+        FROM {SCHEMA_CORE}.fact_water_samples f
+
+        INNER JOIN {SCHEMA_CORE}.dim_bathing_waters d
+            ON f.id = d.id
+
+        INNER JOIN {SCHEMA_CORE}.int_effective_season_bounds esb 
+            ON d.nuts2_name = esb.nuts2_name 
+            AND d.water_type_status_code = esb.water_type_status_code
+
+        WHERE f.has_bacteria_data
+            AND f.sample_week BETWEEN esb.effective_start_week AND esb.effective_end_week
+
+        GROUP BY d.nuts2_name, d.water_type_status_code, f.sample_week
+    ),
+
+    with_rolling AS (
+        SELECT
+            w1.*,
+            COALESCE(w0.n_samples, 0) + w1.n_samples + COALESCE(w2.n_samples, 0) AS n_samples_3wk,
+            COALESCE(w0.n_fails, 0) + w1.n_fails + COALESCE(w2.n_fails, 0) AS n_fails_3wk,
+            COALESCE(w0.n_warnings, 0) + w1.n_warnings + COALESCE(w2.n_warnings, 0) AS n_warnings_3wk
+
+        FROM weekly_data w1
+
+        LEFT JOIN weekly_data w0 
+            ON w1.nuts2_name = w0.nuts2_name 
+            AND w1.water_type_status_code = w0.water_type_status_code
+            AND w0.sample_week = w1.sample_week - 1
+
+        LEFT JOIN weekly_data w2 
+            ON w1.nuts2_name = w2.nuts2_name 
+            AND w1.water_type_status_code = w2.water_type_status_code
+            AND w2.sample_week = w1.sample_week + 1
+    )
+
+    SELECT
+        nuts2_name AS region,
+        water_type_status_code AS water_type,
+        sample_week AS week,
+
+        -- 3-week rolling
+        ROUND(100.0 * n_fails_3wk / NULLIF(n_samples_3wk, 0), 2) AS fail_rate_pct,
+        ROUND(100.0 * n_warnings_3wk / NULLIF(n_samples_3wk, 0), 2) AS warning_rate_pct,
+
+        -- single week
+
+        n_samples,
+        n_fails,
+        n_warnings,
+        ROUND(100.0 * n_fails / NULLIF(n_samples, 0), 2) AS fail_rate_week_pct,
+        ROUND(100.0 * n_warnings / NULLIF(n_samples, 0), 2) AS warning_rate_week_pct,
+        n_locations,
+
+        -- confidence
+
+        CASE 
+            WHEN n_locations >= 50 THEN 'high'
+            WHEN n_locations >= 20 THEN 'medium'
+            ELSE 'low'
+        END AS confidence
+
+    FROM with_rolling
+
+    ORDER BY region, water_type, week
+    ;
+    """
+    with duckdb.get_connection() as conn:
+        ensure_schema(conn, schema_name)
+        _ = conn.execute(query=query)
+
+        return build_materialize_result(conn, schema_name, table_name)
+
+
+@dg.asset(
+    deps=[
+        "fact_water_samples",
+        "dim_bathing_waters",
+        "int_effective_season_bounds",
+    ],
+    group_name="mart_analytics",
+    pool=_DLT_DUCKDB_POOL,
+    kinds={"duckdb"},
+)
 def mart_weekly_bloom_metrics(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
     schema_name = SCHEMA_MART
     table_name = "mart_weekly_bloom_metrics"
