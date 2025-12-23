@@ -41,7 +41,7 @@ core_facts_job = dg.define_asset_job(
 core_intermediate_job = dg.define_asset_job(
     name="core_intermediate_refresh",
     selection=dg.AssetSelection.assets(
-        "ref_effective_season_bounds",
+        "int_effective_season_bounds",
     ),
 )
 
