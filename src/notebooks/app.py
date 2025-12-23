@@ -12,9 +12,25 @@ app = marimo.App(
 def _():
     import marimo as mo
 
+    from kpi import app as app_kpi
     from algae import app as app_algae
     from bact import app as app_bact
-    return app_algae, app_bact, mo
+    return app_algae, app_bact, app_kpi, mo
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Season-to-Date Sampling Overview
+    """)
+    return
+
+
+@app.cell
+async def _(app_kpi):
+    embed_kpi = await app_kpi.embed()
+    embed_kpi.output
+    return
 
 
 @app.cell(hide_code=True)
