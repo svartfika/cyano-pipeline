@@ -269,25 +269,17 @@ def dim_bathing_waters(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
     SELECT
         p._waters_id AS id,
         p.bathing_water__name AS name,
-
         p.bathing_water__eu_type AS is_eu_designated,
 
         l.water_type_id,
         l.status_code AS water_type_status_code,
 
+        -- risk assesment
+
         p.algae AS algae_bloom_risk,
         p.cyano AS cyanobacteria_risk,
 
-        p.bathing_season__starts_at AS season_start,
-        p.bathing_season__ends_at AS season_end,
-
-        EXTRACT(WEEK FROM p.bathing_season__starts_at)::INTEGER AS season_start_week,
-        EXTRACT(WEEK FROM p.bathing_season__ends_at)::INTEGER AS season_end_week,
-
-        DATEDIFF('day',
-            p.bathing_season__starts_at,
-            p.bathing_season__ends_at
-        ) + 1 AS season_duration_days,
+        -- location
 
         TRIM(p.bathing_water__municipality__name) AS municipality_raw,
         m.municipality,
@@ -296,10 +288,9 @@ def dim_bathing_waters(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
         m.land,
         m.nuts1_name,
         m.nuts2_name,
-
-        TRY_CAST(p.bathing_water__sampling_point_position__longitude AS DOUBLE) AS sampling_point_lon,
-        TRY_CAST(p.bathing_water__sampling_point_position__latitude AS DOUBLE) AS sampling_point_lat,
         
+        -- spatial
+
         CASE 
             WHEN TRY_CAST(p.bathing_water__sampling_point_position__longitude AS DOUBLE) IS NOT NULL
                 AND TRY_CAST(p.bathing_water__sampling_point_position__latitude AS DOUBLE) IS NOT NULL
