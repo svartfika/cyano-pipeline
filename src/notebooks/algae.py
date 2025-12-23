@@ -23,14 +23,14 @@ def _():
 
     conn = duckdb.connect(
         database=str(get_root() / DUCKDB_PATH),
-        read_only=False,
+        read_only=True,
     )
     return (conn,)
 
 
 @app.cell
 def _(conn, mo):
-    df_conn = mo.sql(
+    rel_algae = mo.sql(
         f"""
         SELECT * FROM mart.mart_weekly_bloom_metrics
 
@@ -40,22 +40,22 @@ def _(conn, mo):
         output=False,
         engine=conn
     )
-    return (df_conn,)
+    return (rel_algae,)
 
 
 @app.cell
-def _(df_conn):
-    df = df_conn.df()
+def _(rel_algae):
+    df_algae = rel_algae.df()
 
-    df["water_type"] = df["water_type"].str.capitalize()
-    return (df,)
+    df_algae["water_type"] = df_algae["water_type"].str.capitalize()
+    return (df_algae,)
 
 
 @app.cell
-def _(df):
+def _(df_algae):
     import altair as alt
 
-    base = alt.Chart(df).encode(
+    base = alt.Chart(df_algae).encode(
         alt.X("week", type="ordinal").axis(labelAngle=0).title("Week"),
         alt.Y("region", type="ordinal").sort("-x").title("Region"),
     )
@@ -70,7 +70,7 @@ def _(df):
             range=["#81c4e7", "#fff59d", "#ffb74d", "#ff7043", "#e53935"],
             clamp=True,
         )
-        .title(["Bloom Risk (3-week avg %)"]),
+        .title("Bloom rate (%)"),
         opacity=alt.Opacity("confidence", type="nominal")
         .scale(
             domain=["low", "medium", "high"],
@@ -79,13 +79,13 @@ def _(df):
         .legend(None),
         tooltip=[
             alt.Tooltip("region:N", title="Region"),
-            alt.Tooltip("water_type:N", title="Water Type"),
+            alt.Tooltip("water_type:N", title="Water type"),
             alt.Tooltip("week:O", title="Week"),
-            alt.Tooltip("bloom_rate_pct:Q", title="3-week avg", format=".1f"),
-            alt.Tooltip("bloom_rate_week_pct:Q", title="This week", format=".1f"),
+            alt.Tooltip("bloom_rate_pct:Q", title="Rolling %", format=".1f"),
+            alt.Tooltip("bloom_rate_week_pct:Q", title="Week %", format=".1f"),
             alt.Tooltip("n_samples:Q", title="Samples"),
             alt.Tooltip("n_locations:Q", title="Locations"),
-            alt.Tooltip("confidence:N", title="Confidence ⚠️"),
+            alt.Tooltip("confidence:N", title="Confidence"),
         ],
     )
 
@@ -95,8 +95,8 @@ def _(df):
         .configure_view(fill="#f8f9fa")
         .properties(
             title=alt.Title(
-                text="Weekly Algae Bloom Risk",
-                subtitle="3-week rolling average",
+                text="Bloom Risk",
+                subtitle="3-week rolling rate",
             )
         )
     )
