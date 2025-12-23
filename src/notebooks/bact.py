@@ -48,8 +48,6 @@ def _(rel_bact):
     df_bact = rel_bact.df()
 
     df_bact["water_type"] = df_bact["water_type"].str.capitalize()
-
-    df_bact.sample(10)
     return (df_bact,)
 
 
@@ -72,7 +70,7 @@ def _(df_bact):
             range=["#c8e6c9", "#fff59d", "#ffb74d", "#ff7043", "#e53935"],
             clamp=True,
         )
-        .title(["Bacteria Fail Rate (3-week avg %)"]),
+        .title("Fail rate (%)"),
         opacity=alt.Opacity("confidence", type="nominal")
         .scale(
             domain=["low", "medium", "high"],
@@ -81,14 +79,14 @@ def _(df_bact):
         .legend(None),
         tooltip=[
             alt.Tooltip("region:N", title="Region"),
-            alt.Tooltip("water_type:N", title="Water Type"),
+            alt.Tooltip("water_type:N", title="Water type"),
             alt.Tooltip("week:O", title="Week"),
-            alt.Tooltip("fail_rate_pct:Q", title="3-week fail %", format=".1f"),
-            alt.Tooltip("warning_rate_pct:Q", title="3-week warning %", format=".1f"),
-            alt.Tooltip("fail_rate_week_pct:Q", title="This week fail %", format=".1f"),
+            alt.Tooltip("fail_rate_pct:Q", title="Rolling %", format=".1f"),
+            alt.Tooltip("warning_rate_pct:Q", title="Warning %", format=".1f"),
+            alt.Tooltip("fail_rate_week_pct:Q", title="Week %", format=".1f"),
             alt.Tooltip("n_samples:Q", title="Samples"),
             alt.Tooltip("n_locations:Q", title="Locations"),
-            alt.Tooltip("confidence:N", title="Confidence ⚠️"),
+            alt.Tooltip("confidence:N", title="Confidence"),
         ],
     )
 
@@ -98,8 +96,8 @@ def _(df_bact):
         .configure_view(fill="#f8f9fa")
         .properties(
             title=alt.Title(
-                text="Weekly Bacteria Quality",
-                subtitle="3-week rolling fail rate (E.coli or Enterococci)",
+                text="Bacteria Risk",
+                subtitle="3-week rolling fail rate",
             )
         )
     )

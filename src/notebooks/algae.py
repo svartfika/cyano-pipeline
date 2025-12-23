@@ -48,8 +48,6 @@ def _(rel_algae):
     df_algae = rel_algae.df()
 
     df_algae["water_type"] = df_algae["water_type"].str.capitalize()
-
-    df_algae.sample(10)
     return (df_algae,)
 
 
@@ -72,7 +70,7 @@ def _(df_algae):
             range=["#81c4e7", "#fff59d", "#ffb74d", "#ff7043", "#e53935"],
             clamp=True,
         )
-        .title(["Bloom Risk (3-week avg %)"]),
+        .title("Bloom rate (%)"),
         opacity=alt.Opacity("confidence", type="nominal")
         .scale(
             domain=["low", "medium", "high"],
@@ -81,13 +79,13 @@ def _(df_algae):
         .legend(None),
         tooltip=[
             alt.Tooltip("region:N", title="Region"),
-            alt.Tooltip("water_type:N", title="Water Type"),
+            alt.Tooltip("water_type:N", title="Water type"),
             alt.Tooltip("week:O", title="Week"),
-            alt.Tooltip("bloom_rate_pct:Q", title="3-week avg", format=".1f"),
-            alt.Tooltip("bloom_rate_week_pct:Q", title="This week", format=".1f"),
+            alt.Tooltip("bloom_rate_pct:Q", title="Rolling %", format=".1f"),
+            alt.Tooltip("bloom_rate_week_pct:Q", title="Week %", format=".1f"),
             alt.Tooltip("n_samples:Q", title="Samples"),
             alt.Tooltip("n_locations:Q", title="Locations"),
-            alt.Tooltip("confidence:N", title="Confidence ⚠️"),
+            alt.Tooltip("confidence:N", title="Confidence"),
         ],
     )
 
@@ -97,8 +95,8 @@ def _(df_algae):
         .configure_view(fill="#f8f9fa")
         .properties(
             title=alt.Title(
-                text="Weekly Algae Bloom Risk",
-                subtitle="3-week rolling average",
+                text="Bloom Risk",
+                subtitle="3-week rolling rate",
             )
         )
     )
