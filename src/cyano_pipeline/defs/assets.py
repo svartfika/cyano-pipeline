@@ -128,13 +128,46 @@ def ref_lookup_algal_id(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
     CREATE OR REPLACE TABLE {fq_table_name} (
         algal_id INT PRIMARY KEY,
         status_code VARCHAR NOT NULL UNIQUE,
+        status_label_sv VARCHAR NOT NULL,
         sort_order INT
     );
 
     INSERT INTO {fq_table_name} VALUES 
-        (3, 'bloom', 1),
-        (4, 'no_bloom', 2),
-        (5, 'no_data', 3)
+        (3, 'bloom', 'Blomning', 1),
+        (4, 'no_bloom', 'Ingen blomning', 2),
+        (5, 'no_data', 'Ingen uppgift', 3)
+    ;
+    """
+    with duckdb.get_connection() as conn:
+        ensure_schema(conn, schema_name)
+        _ = conn.execute(query=query)
+
+        return build_materialize_result(conn, schema_name, table_name)
+
+
+@dg.asset(
+    group_name="core_lookup",
+    pool=_DLT_DUCKDB_POOL,
+    kinds={"duckdb"},
+)
+def ref_lookup_bacteria_assess_id(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
+    schema_name = SCHEMA_CORE
+    table_name = "ref_lookup_bacteria_assess_id"
+    fq_table_name = f"{schema_name}.{table_name}"
+
+    query = f"""
+    CREATE OR REPLACE TABLE {fq_table_name} (
+        assess_id INT PRIMARY KEY,
+        status_code VARCHAR NOT NULL UNIQUE,
+        status_label_sv VARCHAR NOT NULL,
+        sort_order INT
+    );
+
+    INSERT INTO {fq_table_name} VALUES 
+        (1, 'pass', 'Tjänligt', 1),
+        (2, 'warning', 'Tjänligt med anmärkning', 2),
+        (3, 'fail', 'Otjänligt', 3),
+        (0, 'no_data', 'Uppgift saknas', 4)
     ;
     """
     with duckdb.get_connection() as conn:
@@ -158,14 +191,15 @@ def ref_lookup_water_type_id(duckdb: DuckDBResource) -> dg.MaterializeResult[Any
     CREATE OR REPLACE TABLE {fq_table_name} (
         water_type_id INT PRIMARY KEY,
         status_code VARCHAR NOT NULL UNIQUE,
+        status_label_sv VARCHAR NOT NULL,
         sort_order INT
     );
 
     INSERT INTO {fq_table_name} VALUES 
-        (1, 'sea', 1),
-        (2, 'river', 2),
-        (3, 'lake', 3),
-        (4, 'delta', 4)
+        (1, 'sea', 'Hav', 1),
+        (2, 'river', 'Vattendrag', 2),
+        (3, 'lake', 'Sjö', 3),
+        (4, 'delta', 'Delta', 4)
     ;
     """
     with duckdb.get_connection() as conn:
