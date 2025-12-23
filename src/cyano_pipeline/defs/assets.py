@@ -377,7 +377,9 @@ def fact_water_samples(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
 
         r.escherichia_coli_assess_id AS ecoli_assess_id,
         ecoli_lookup.status_code AS ecoli_status_code,
+
         r.escherichia_coli_count AS ecoli_count,
+        r.escherichia_coli_prefix AS ecoli_count_prefix,
 
         r.escherichia_coli_assess_id IN (1, 2, 3) AS has_ecoli_data,
         r.escherichia_coli_assess_id = 3 AS is_ecoli_fail,
@@ -387,7 +389,9 @@ def fact_water_samples(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
 
         r.intestinal_enterococci_assess_id AS enterococci_assess_id,
         enterococci_lookup.status_code AS enterococci_status_code,
+
         r.intestinal_enterococci_count AS enterococci_count,
+        r.intestinal_enterococci_prefix AS enterococci_count_prefix,
 
         r.intestinal_enterococci_assess_id IN (1, 2, 3) AS has_enterococci_data,
         r.intestinal_enterococci_assess_id = 3 AS is_enterococci_fail,
