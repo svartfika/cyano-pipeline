@@ -12,10 +12,11 @@ app = marimo.App(
 def _():
     import marimo as mo
 
+    from map import app as app_map
     from kpi import app as app_kpi
     from algae import app as app_algae
     from bact import app as app_bact
-    return app_algae, app_bact, app_kpi, mo
+    return app_algae, app_bact, app_kpi, app_map, mo
 
 
 @app.cell(hide_code=True)
@@ -69,6 +70,21 @@ def _(mo):
 async def _(app_bact):
     embed_bact = await app_bact.embed()
     embed_bact.output
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Map
+    """)
+    return
+
+
+@app.cell
+async def _(app_map):
+    embed_map = await app_map.embed()
+    embed_map.output
     return
 
 
