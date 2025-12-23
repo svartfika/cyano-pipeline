@@ -209,6 +209,42 @@ def ref_lookup_water_type_id(duckdb: DuckDBResource) -> dg.MaterializeResult[Any
         return build_materialize_result(conn, schema_name, table_name)
 
 
+@dg.asset(
+    group_name="core_lookup",
+    pool=_DLT_DUCKDB_POOL,
+    kinds={"duckdb"},
+)
+def ref_lookup_quality_class_id(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
+    schema_name = SCHEMA_CORE
+    table_name = "ref_lookup_quality_class_id"
+    fq_table_name = f"{schema_name}.{table_name}"
+
+    query = f"""
+    CREATE OR REPLACE TABLE {fq_table_name} (
+        quality_class_id INT PRIMARY KEY,
+        status_code VARCHAR NOT NULL,
+        status_label_sv VARCHAR NOT NULL,
+        sort_order INT
+    );
+
+    INSERT INTO {fq_table_name} VALUES 
+        (1, 'excellent', 'Utmärkt kvalitet', 1),
+        (2, 'good', 'Bra kvalitet', 2),
+        (3, 'satisfactory', 'Tillfredställande kvalitet', 3),
+        (4, 'poor', 'Dålig kvalitet', 4),
+        (6, 'new', 'Ny badplats', 10),
+        (5, 'insufficient_data', 'Otillräckligt provtagen', 11),
+        (7, 'pending', 'Klassificering pågår', 12),
+        (0, 'not_classified', 'Ej klassificerad', 99)
+    ;
+    """
+    with duckdb.get_connection() as conn:
+        ensure_schema(conn, schema_name)
+        _ = conn.execute(query=query)
+
+        return build_materialize_result(conn, schema_name, table_name)
+
+
 # --- Dim ---
 
 
