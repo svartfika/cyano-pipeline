@@ -252,6 +252,7 @@ def ref_lookup_quality_class_id(duckdb: DuckDBResource) -> dg.MaterializeResult[
     deps=[
         "dlt_havochvatten_source_profiles",
         "ref_lookup_water_type_id",
+        "ref_lookup_quality_class_id",
         "ref_municipalities_aliases",
         "ref_municipalities",
     ],
@@ -267,13 +268,35 @@ def dim_bathing_waters(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
     query = f"""
     CREATE OR REPLACE TABLE {fq_table_name} AS
 
+    WITH latest_classification AS (
+        SELECT 
+            _dlt_parent_id,
+            quality_class_id,
+            "year" AS classification_year
+
+        FROM {SCHEMA_RAW_HAVOCHVATTEN}.profiles__last_four_classifications
+        
+        -- exclude pending
+        WHERE quality_class_id != 7
+
+        QUALIFY ROW_NUMBER() OVER (
+            PARTITION BY _dlt_parent_id ORDER BY "year" DESC
+        ) = 1
+    )
+
     SELECT
         p._waters_id AS id,
         p.bathing_water__name AS name,
-        p.bathing_water__eu_type AS is_eu_designated,
 
         l.water_type_id,
         l.status_code AS water_type_status_code,
+
+        p.bathing_water__eu_type AS is_eu_designated,
+
+        -- classification
+        
+        lc.classification_year,
+        lq.status_code AS quality_status_code,
 
         -- risk assesment
 
@@ -302,6 +325,12 @@ def dim_bathing_waters(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
 
     LEFT JOIN {SCHEMA_CORE}.ref_lookup_water_type_id l
         ON p.bathing_water__water_type_id = l.water_type_id
+
+    LEFT JOIN latest_classification lc
+        ON p._dlt_id = lc._dlt_parent_id
+
+    LEFT JOIN {SCHEMA_CORE}.ref_lookup_quality_class_id lq
+        ON lc.quality_class_id = lq.quality_class_id
 
     LEFT JOIN {SCHEMA_CORE}.ref_municipalities_aliases a
         ON TRIM(p.bathing_water__municipality__name) = a.source_name
