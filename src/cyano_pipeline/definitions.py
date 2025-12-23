@@ -48,6 +48,7 @@ core_intermediate_job = dg.define_asset_job(
 mart_analytics_job = dg.define_asset_job(
     name="mart_analytics_refresh",
     selection=dg.AssetSelection.assets(
+        "mart_weekly_bacteria_metrics",
         "mart_weekly_bloom_metrics",
     ),
 )
