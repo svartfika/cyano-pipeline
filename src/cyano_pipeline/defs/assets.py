@@ -549,7 +549,6 @@ def mart_weekly_bloom_metrics(duckdb: DuckDBResource) -> dg.MaterializeResult[An
     CREATE OR REPLACE TABLE {fq_table_name} AS
 
     WITH weekly_data AS (
-
         SELECT
             d.nuts2_name,
             d.water_type_status_code,
@@ -568,45 +567,55 @@ def mart_weekly_bloom_metrics(duckdb: DuckDBResource) -> dg.MaterializeResult[An
             AND d.water_type_status_code = esb.water_type_status_code
 
         WHERE f.has_algae_data
-            AND f.sample_week BETWEEN esb.effective_start_week
-            AND esb.effective_end_week
+            AND f.sample_week BETWEEN esb.effective_start_week AND esb.effective_end_week
 
         GROUP BY d.nuts2_name, d.water_type_status_code, f.sample_week
+    ),
+
+    with_rolling AS (
+        SELECT
+            w1.*,
+            COALESCE(w0.n_samples, 0) + w1.n_samples + COALESCE(w2.n_samples, 0) AS n_samples_3wk,
+            COALESCE(w0.n_blooms, 0) + w1.n_blooms + COALESCE(w2.n_blooms, 0) AS n_blooms_3wk
+
+        FROM weekly_data w1
+
+        LEFT JOIN weekly_data w0 
+            ON w1.nuts2_name = w0.nuts2_name 
+            AND w1.water_type_status_code = w0.water_type_status_code
+            AND w0.sample_week = w1.sample_week - 1
+
+        LEFT JOIN weekly_data w2 
+            ON w1.nuts2_name = w2.nuts2_name 
+            AND w1.water_type_status_code = w2.water_type_status_code
+            AND w2.sample_week = w1.sample_week + 1
     )
 
     SELECT
-        w1.nuts2_name AS region,
-        w1.water_type_status_code AS water_type,
-        w1.sample_week AS week,
-        
-        -- Rolling 3-week
-        ROUND(100.0 * (COALESCE(w0.n_blooms, 0) + w1.n_blooms + COALESCE(w2.n_blooms, 0)) 
-            / NULLIF(COALESCE(w0.n_samples, 0) + w1.n_samples + COALESCE(w2.n_samples, 0), 0), 2) AS bloom_rate_pct,
-        
-        -- Detail metrics
-        w1.n_samples,
-        w1.n_blooms,
-        ROUND(100.0 * w1.n_blooms / NULLIF(w1.n_samples, 0), 2) AS bloom_rate_week_pct,
-        w1.n_locations,
-        
-        -- Confidence
+        nuts2_name AS region,
+        water_type_status_code AS water_type,
+        sample_week AS week,
+
+        -- 3-week rolling
+
+        ROUND(100.0 * n_blooms_3wk / NULLIF(n_samples_3wk, 0), 2) AS bloom_rate_pct,
+
+        -- single week
+
+        n_samples,
+        n_blooms,
+        ROUND(100.0 * n_blooms / NULLIF(n_samples, 0), 2) AS bloom_rate_week_pct,
+        n_locations,
+
+        -- confidence
+
         CASE 
-            WHEN w1.n_locations >= 50 THEN 'high'
-            WHEN w1.n_locations >= 20 THEN 'medium'
+            WHEN n_locations >= 50 THEN 'high'
+            WHEN n_locations >= 20 THEN 'medium'
             ELSE 'low'
         END AS confidence
 
-    FROM weekly_data w1
-
-    LEFT JOIN weekly_data w0 
-        ON w1.nuts2_name = w0.nuts2_name 
-        AND w1.water_type_status_code = w0.water_type_status_code
-        AND w0.sample_week = w1.sample_week - 1
-
-    LEFT JOIN weekly_data w2 
-        ON w1.nuts2_name = w2.nuts2_name 
-        AND w1.water_type_status_code = w2.water_type_status_code
-        AND w2.sample_week = w1.sample_week + 1
+    FROM with_rolling
 
     ORDER BY region, water_type, week
     ;
