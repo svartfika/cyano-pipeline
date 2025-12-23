@@ -351,6 +351,7 @@ def dim_bathing_waters(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
     deps=[
         "dlt_havochvatten_source_results",
         "ref_lookup_algal_id",
+        "ref_lookup_bacteria_assess_id",
     ],
     group_name="core_bathing_waters",
     pool=_DLT_DUCKDB_POOL,
@@ -368,17 +369,53 @@ def fact_water_samples(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
         r._waters_id AS id,
 
         r.taken_at,
-
         r.taken_at::DATE AS sample_date,
         EXTRACT(YEAR FROM r.taken_at)::INTEGER AS sample_year,
         EXTRACT(MONTH FROM r.taken_at)::INTEGER AS sample_month,
         EXTRACT(WEEK FROM r.taken_at)::INTEGER AS sample_week,
 
-        l.algal_id,
-        l.status_code AS algal_status_code,
+        -- algae
 
-        (r.algal_id IS NOT NULL AND r.algal_id IN (3, 4)) AS has_algae_data,
-        (r.algal_id = 3) AS is_bloom,
+        algae_lookup.algal_id,
+        algae_lookup.status_code AS algal_status_code,
+
+        r.algal_id IN (3, 4) AS has_algae_data,
+        r.algal_id = 3 AS is_bloom,
+
+        -- e. coli
+
+        r.escherichia_coli_assess_id AS ecoli_assess_id,
+        ecoli_lookup.status_code AS ecoli_status_code,
+        r.escherichia_coli_count AS ecoli_count,
+
+        r.escherichia_coli_assess_id IN (1, 2, 3) AS has_ecoli_data,
+        r.escherichia_coli_assess_id = 3 AS is_ecoli_fail,
+        r.escherichia_coli_assess_id = 2 AS is_ecoli_warning,
+
+        -- enterococci
+
+        r.intestinal_enterococci_assess_id AS enterococci_assess_id,
+        enterococci_lookup.status_code AS enterococci_status_code,
+        r.intestinal_enterococci_count AS enterococci_count,
+
+        r.intestinal_enterococci_assess_id IN (1, 2, 3) AS has_enterococci_data,
+        r.intestinal_enterococci_assess_id = 3 AS is_enterococci_fail,
+        r.intestinal_enterococci_assess_id = 2 AS is_enterococci_warning,
+
+        -- bacteria (combined)
+
+        r.escherichia_coli_assess_id IN (1, 2, 3)
+            OR r.intestinal_enterococci_assess_id IN (1, 2, 3) 
+            AS has_bacteria_data,
+
+        r.escherichia_coli_assess_id = 3
+            OR r.intestinal_enterococci_assess_id = 3 
+            AS is_bacteria_fail,
+
+        (r.escherichia_coli_assess_id = 2 OR r.intestinal_enterococci_assess_id = 2)
+            AND COALESCE(r.escherichia_coli_assess_id, 0) != 3
+            AND COALESCE(r.intestinal_enterococci_assess_id, 0) != 3
+            AS is_bacteria_warning,
 
         TRY_CAST(r.water_temp AS DOUBLE) AS water_temp,
 
@@ -387,8 +424,14 @@ def fact_water_samples(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
 
     FROM {SCHEMA_RAW_HAVOCHVATTEN}.results r
 
-    LEFT JOIN {SCHEMA_CORE}.ref_lookup_algal_id l
-        ON r.algal_id = l.algal_id
+    LEFT JOIN {SCHEMA_CORE}.ref_lookup_algal_id algae_lookup
+        ON r.algal_id = algae_lookup.algal_id
+
+    LEFT JOIN {SCHEMA_CORE}.ref_lookup_bacteria_assess_id ecoli_lookup
+        ON r.escherichia_coli_assess_id = ecoli_lookup.assess_id
+
+    LEFT JOIN {SCHEMA_CORE}.ref_lookup_bacteria_assess_id enterococci_lookup
+        ON r.intestinal_enterococci_assess_id = enterococci_lookup.assess_id
     ;
     """
     with duckdb.get_connection() as conn:
