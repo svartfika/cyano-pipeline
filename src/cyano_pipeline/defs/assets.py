@@ -590,22 +590,18 @@ def mart_weekly_bacteria_metrics(duckdb: DuckDBResource) -> dg.MaterializeResult
 
     with_rolling AS (
         SELECT
-            w1.*,
-            COALESCE(w0.n_samples, 0) + w1.n_samples + COALESCE(w2.n_samples, 0) AS n_samples_3wk,
-            COALESCE(w0.n_fails, 0) + w1.n_fails + COALESCE(w2.n_fails, 0) AS n_fails_3wk,
-            COALESCE(w0.n_warnings, 0) + w1.n_warnings + COALESCE(w2.n_warnings, 0) AS n_warnings_3wk
+            *,
+            SUM(n_samples) OVER w AS n_samples_3wk,
+            SUM(n_fails) OVER w AS n_fails_3wk,
+            SUM(n_warnings) OVER w AS n_warnings_3wk
 
-        FROM weekly_data w1
+        FROM weekly_data
 
-        LEFT JOIN weekly_data w0 
-            ON w1.nuts2_name = w0.nuts2_name 
-            AND w1.water_type_status_code = w0.water_type_status_code
-            AND w0.sample_week = w1.sample_week - 1
-
-        LEFT JOIN weekly_data w2 
-            ON w1.nuts2_name = w2.nuts2_name 
-            AND w1.water_type_status_code = w2.water_type_status_code
-            AND w2.sample_week = w1.sample_week + 1
+        WINDOW w AS (
+            PARTITION BY nuts2_name, water_type_status_code 
+            ORDER BY sample_week 
+            ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
+        )
     )
 
     SELECT
@@ -691,21 +687,17 @@ def mart_weekly_bloom_metrics(duckdb: DuckDBResource) -> dg.MaterializeResult[An
 
     with_rolling AS (
         SELECT
-            w1.*,
-            COALESCE(w0.n_samples, 0) + w1.n_samples + COALESCE(w2.n_samples, 0) AS n_samples_3wk,
-            COALESCE(w0.n_blooms, 0) + w1.n_blooms + COALESCE(w2.n_blooms, 0) AS n_blooms_3wk
+            *,
+            SUM(n_samples) OVER w AS n_samples_3wk,
+            SUM(n_blooms) OVER w AS n_blooms_3wk
 
-        FROM weekly_data w1
-
-        LEFT JOIN weekly_data w0 
-            ON w1.nuts2_name = w0.nuts2_name 
-            AND w1.water_type_status_code = w0.water_type_status_code
-            AND w0.sample_week = w1.sample_week - 1
-
-        LEFT JOIN weekly_data w2 
-            ON w1.nuts2_name = w2.nuts2_name 
-            AND w1.water_type_status_code = w2.water_type_status_code
-            AND w2.sample_week = w1.sample_week + 1
+        FROM weekly_data
+        
+        WINDOW w AS (
+            PARTITION BY nuts2_name, water_type_status_code 
+            ORDER BY sample_week 
+            ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
+        )
     )
 
     SELECT
