@@ -56,6 +56,7 @@ def havochvatten_assets(context: dg.AssetExecutionContext, dlt: DagsterDltResour
     kinds={"duckdb"},
 )
 def ref_municipalities(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
+    """Loads Swedish municipality-to-region mapping from seed CSV."""
     schema_name = SCHEMA_CORE
     table_name = "ref_municipalities"
     fq_table_name = f"{schema_name}.{table_name}"
@@ -89,6 +90,7 @@ def ref_municipalities(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
     kinds={"duckdb"},
 )
 def ref_municipalities_aliases(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
+    """Maps municipality name variants to canonical names."""
     schema_name = SCHEMA_CORE
     table_name = "ref_municipalities_aliases"
     fq_table_name = f"{schema_name}.{table_name}"
@@ -120,6 +122,7 @@ def ref_municipalities_aliases(duckdb: DuckDBResource) -> dg.MaterializeResult[A
     kinds={"duckdb"},
 )
 def ref_lookup_algal_id(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
+    """Lookup table for algal bloom status codes."""
     schema_name = SCHEMA_CORE
     table_name = "ref_lookup_algal_id"
     fq_table_name = f"{schema_name}.{table_name}"
@@ -151,6 +154,7 @@ def ref_lookup_algal_id(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
     kinds={"duckdb"},
 )
 def ref_lookup_bacteria_assess_id(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
+    """Lookup table for bacteria assessment status codes."""
     schema_name = SCHEMA_CORE
     table_name = "ref_lookup_bacteria_assess_id"
     fq_table_name = f"{schema_name}.{table_name}"
@@ -183,6 +187,7 @@ def ref_lookup_bacteria_assess_id(duckdb: DuckDBResource) -> dg.MaterializeResul
     kinds={"duckdb"},
 )
 def ref_lookup_water_type_id(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
+    """Lookup table for water body type codes (sea, lake, river, delta)."""
     schema_name = SCHEMA_CORE
     table_name = "ref_lookup_water_type_id"
     fq_table_name = f"{schema_name}.{table_name}"
@@ -215,6 +220,7 @@ def ref_lookup_water_type_id(duckdb: DuckDBResource) -> dg.MaterializeResult[Any
     kinds={"duckdb"},
 )
 def ref_lookup_quality_class_id(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
+    """Lookup table for EU bathing water quality classifications."""
     schema_name = SCHEMA_CORE
     table_name = "ref_lookup_quality_class_id"
     fq_table_name = f"{schema_name}.{table_name}"
@@ -261,6 +267,7 @@ def ref_lookup_quality_class_id(duckdb: DuckDBResource) -> dg.MaterializeResult[
     kinds={"duckdb"},
 )
 def dim_bathing_waters(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
+    """Dimension table of bathing water locations with geography and classification."""
     schema_name = SCHEMA_CORE
     table_name = "dim_bathing_waters"
     fq_table_name = f"{schema_name}.{table_name}"
@@ -362,6 +369,7 @@ def dim_bathing_waters(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
     kinds={"duckdb"},
 )
 def fact_water_samples(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
+    """Fact table of water quality samples with algae and bacteria measurements."""
     schema_name = SCHEMA_CORE
     table_name = "fact_water_samples"
     fq_table_name = f"{schema_name}.{table_name}"
@@ -462,6 +470,7 @@ def fact_water_samples(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
     kinds={"duckdb"},
 )
 def int_effective_season_bounds(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
+    """Computes regional bathing season date ranges from sampling patterns."""
     schema_name = SCHEMA_CORE
     table_name = "int_effective_season_bounds"
     fq_table_name = f"{schema_name}.{table_name}"
@@ -549,6 +558,7 @@ def int_effective_season_bounds(duckdb: DuckDBResource) -> dg.MaterializeResult[
     kinds={"duckdb"},
 )
 def mart_weekly_bacteria_metrics(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
+    """Weekly bacteria fail/warning rates by region with 3-week rolling averages."""
     schema_name = SCHEMA_MART
     table_name = "mart_weekly_bacteria_metrics"
     fq_table_name = f"{schema_name}.{table_name}"
@@ -650,6 +660,7 @@ def mart_weekly_bacteria_metrics(duckdb: DuckDBResource) -> dg.MaterializeResult
     kinds={"duckdb"},
 )
 def mart_weekly_bloom_metrics(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
+    """Weekly algae bloom rates by region with 3-week rolling averages."""
     schema_name = SCHEMA_MART
     table_name = "mart_weekly_bloom_metrics"
     fq_table_name = f"{schema_name}.{table_name}"
