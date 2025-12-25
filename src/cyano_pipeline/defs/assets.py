@@ -380,57 +380,54 @@ def fact_water_samples(duckdb: DuckDBResource) -> dg.MaterializeResult[Any]:
     SELECT
         r._waters_id AS id,
 
+        -- temporal
         r.taken_at,
         r.taken_at::DATE AS sample_date,
         EXTRACT(YEAR FROM r.taken_at)::INTEGER AS sample_year,
         EXTRACT(MONTH FROM r.taken_at)::INTEGER AS sample_month,
         EXTRACT(WEEK FROM r.taken_at)::INTEGER AS sample_week,
 
-        -- algae
-
+        -- algae: bloom/no_bloom = valid observation, no_data = missing
         algae_lookup.algal_id,
         algae_lookup.status_code AS algal_status_code,
 
-        r.algal_id IN (3, 4) AS has_algae_data,
-        r.algal_id = 3 AS is_bloom,
+        algae_lookup.status_code IN ('bloom', 'no_bloom') AS has_algae_data,
+        algae_lookup.status_code = 'bloom' AS is_bloom,
 
-        -- e. coli
-
+        -- e. coli: pass/warning/fail = tested, no_data = untested
         r.escherichia_coli_assess_id AS ecoli_assess_id,
         ecoli_lookup.status_code AS ecoli_status_code,
 
         r.escherichia_coli_count AS ecoli_count,
         r.escherichia_coli_prefix AS ecoli_count_prefix,
 
-        r.escherichia_coli_assess_id IN (1, 2, 3) AS has_ecoli_data,
-        r.escherichia_coli_assess_id = 3 AS is_ecoli_fail,
-        r.escherichia_coli_assess_id = 2 AS is_ecoli_warning,
+        ecoli_lookup.status_code IN ('pass', 'warning', 'fail') AS has_ecoli_data,
+        ecoli_lookup.status_code = 'fail' AS is_ecoli_fail,
+        ecoli_lookup.status_code = 'warning' AS is_ecoli_warning,
 
-        -- enterococci
-
+        -- enterococci: pass/warning/fail = tested, no_data = untested
         r.intestinal_enterococci_assess_id AS enterococci_assess_id,
         enterococci_lookup.status_code AS enterococci_status_code,
 
         r.intestinal_enterococci_count AS enterococci_count,
         r.intestinal_enterococci_prefix AS enterococci_count_prefix,
 
-        r.intestinal_enterococci_assess_id IN (1, 2, 3) AS has_enterococci_data,
-        r.intestinal_enterococci_assess_id = 3 AS is_enterococci_fail,
-        r.intestinal_enterococci_assess_id = 2 AS is_enterococci_warning,
+        enterococci_lookup.status_code IN ('pass', 'warning', 'fail') AS has_enterococci_data,
+        enterococci_lookup.status_code = 'fail' AS is_enterococci_fail,
+        enterococci_lookup.status_code = 'warning' AS is_enterococci_warning,
 
-        -- bacteria (combined)
-
-        r.escherichia_coli_assess_id IN (1, 2, 3)
-            OR r.intestinal_enterococci_assess_id IN (1, 2, 3) 
+        -- bacteria (combined): fail takes precedence over warning
+        ecoli_lookup.status_code IN ('pass', 'warning', 'fail')
+            OR enterococci_lookup.status_code IN ('pass', 'warning', 'fail')
             AS has_bacteria_data,
 
-        r.escherichia_coli_assess_id = 3
-            OR r.intestinal_enterococci_assess_id = 3 
+        ecoli_lookup.status_code = 'fail'
+            OR enterococci_lookup.status_code = 'fail'
             AS is_bacteria_fail,
 
-        (r.escherichia_coli_assess_id = 2 OR r.intestinal_enterococci_assess_id = 2)
-            AND COALESCE(r.escherichia_coli_assess_id, 0) != 3
-            AND COALESCE(r.intestinal_enterococci_assess_id, 0) != 3
+        (ecoli_lookup.status_code = 'warning' OR enterococci_lookup.status_code = 'warning')
+            AND COALESCE(ecoli_lookup.status_code, 'no_data') != 'fail'
+            AND COALESCE(enterococci_lookup.status_code, 'no_data') != 'fail'
             AS is_bacteria_warning,
 
         TRY_CAST(r.water_temp AS DOUBLE) AS water_temp,
