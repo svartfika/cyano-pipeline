@@ -4,37 +4,42 @@ version = "0.1.0"
 description = ""
 readme = "README.md"
 requires-python = ">=3.13"
+
 dependencies = [
-    "dagster-dg-cli>=1.12.6",
+    "dagster>=1.12.6",
     "dagster-dlt>=0.28.6",
     "dagster-duckdb>=0.28.6",
     "dagster-polars>=0.27.8",
-    "dagster-webserver>=1.12.6",
-    "dagster>=1.12.6",
     "dlt[duckdb]>=1.17.0",
+    "duckdb>=1.4.3",
     "psutil>=7.1.0",
-    "pydantic-settings>=2.11.0",
     "pydantic>=2.11.9",
+    "pydantic-settings>=2.11.0",
     "requests-ratelimiter>=0.7.0",
 ]
 
 [dependency-groups]
 dev = [
-    "altair[all]>=6.0.0",
     "basedpyright>=1.36.1",
-    "leafmap>=0.57.10",
-    "marimo[sql]>=0.18.4",
+    "dagster-dg-cli>=1.12.6",
+    "dagster-webserver>=1.12.6",
     "pytest>=9.0.2",
-    "pyzmq>=27.1.0",
     "ruff>=0.14.9",
 ]
 
-[project.scripts]
-cyano-pipeline = "cyano_pipeline:definitions"
+marimo = [
+    "altair[all]>=6.0.0",
+    "leafmap>=0.57.10",
+    "marimo[sql]>=0.18.4",
+    "pyzmq>=27.1.0",
+]
 
 [build-system]
-requires = ["uv_build"]
-build-backend = "uv_build"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cyano_pipeline"]
 
 [tool.dg]
 directory_type = "project"
@@ -45,45 +50,37 @@ root_module = "cyano_pipeline"
 [tool.dg.cli.telemetry]
 enabled = false
 
+[tool.ruff.lint.per-file-ignores]
+"src/notebooks/*.py" = ["F401", "E402", "F541"]
+
 [tool.basedpyright]
 typeCheckingMode = "recommended"
 pythonVersion = "3.13"
+exclude = ["src/notebooks"]
+ignore = ["src/notebooks"]
+useLibraryCodeForTypes = true
 
-# Environment Settings
-useLibraryCodeForTypes = true # Analyzes library source to "guess" types if stubs are missing
-# stubPath = "typings"        # Relative path to your custom type definitions
+# Data Engineering Overrides: Suppress noise from dynamic/untyped libraries
+reportAny = false
+reportExplicitAny = false
+reportMissingTypeStubs = false
+reportUnknownArgumentType = false
+reportUnknownMemberType = false
+reportUnknownParameterType = false
+reportUnknownVariableType = false
 
-# Data Engineering Overrides
-# These suppress "Any/Unknown" noise common when using DataFrames or API clients
-reportAny = false                  # Don't flag expressions that leak the 'Any' type
-reportExplicitAny = false          # Allow 'Any' in type hints as a fallback
-reportUnknownMemberType = false    # Allow accessing untyped attributes (e.g. df.column_name)
-reportUnknownVariableType = false  # Allow variables to have unresolved types from external data
-reportUnknownArgumentType = false  # Allow passing untyped variables into function calls
-reportUnknownParameterType = false # Allow functions to accept data with unresolved types
-reportMissingTypeStubs = false     # Silence warnings for libraries without 'py.typed' files
-
-# Core Safety
-# These catch logic bugs that actually cause production failures
-reportUnboundVariable = "error"      # Catch variables used before they are assigned
-reportUndefinedVariable = "error"    # Catch typos in variable names
-reportOptionalMemberAccess = "error" # Prevent 'NoneType has no attribute' runtime errors
-reportOptionalSubscript = "error"    # Prevent 'NoneType is not subscriptable' errors
+# Runtime Safety: Catch potential logic bugs and NoneType errors
+reportOptionalMemberAccess = "error"
+reportOptionalSubscript = "error"
+reportUnboundVariable = "error"
+reportUndefinedVariable = "error"
 
 # Code Hygiene
-reportUnusedImport = "warning"
-reportUnusedVariable = "warning"
 reportDuplicateImport = "warning"
-reportImplicitStringConcatenation = "warning" # Catches missing commas in lists of strings
-
-# Library Trust List
-allowedUntypedLibraries = ["pandas", "marimo",]
+reportImplicitStringConcatenation = "warning"
+reportUnusedImport = "warning"
 
 # Inference Logic
-strictListInference = true
 strictDictionaryInference = true
+strictListInference = true
 strictSetInference = true
-
-# Exclude/Ignore Marimo notebooks
-exclude = ["src/notebooks/**"]
-ignore = ["src/notebooks/**"]
