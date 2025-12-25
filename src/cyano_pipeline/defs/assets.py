@@ -692,7 +692,7 @@ def mart_weekly_bloom_metrics(duckdb: DuckDBResource) -> dg.MaterializeResult[An
             SUM(n_blooms) OVER w AS n_blooms_3wk
 
         FROM weekly_data
-        
+
         WINDOW w AS (
             PARTITION BY nuts2_name, water_type_status_code 
             ORDER BY sample_week 
@@ -734,3 +734,41 @@ def mart_weekly_bloom_metrics(duckdb: DuckDBResource) -> dg.MaterializeResult[An
         _ = conn.execute(query=query)
 
         return build_materialize_result(conn, schema_name, table_name)
+
+
+# === Asset checks ===
+
+
+@dg.asset_check(asset="dim_bathing_waters")
+def check_municipality_coverage(duckdb: DuckDBResource) -> dg.AssetCheckResult:
+    """Verify all bathing waters have valid municipality mappings."""
+    query = f"""
+    SELECT
+
+        COUNT(*) AS total,
+        COUNT(*) FILTER (WHERE municipality IS NULL) AS orphaned
+
+    FROM {SCHEMA_CORE}.dim_bathing_waters
+    """
+    with duckdb.get_connection() as conn:
+        row = conn.execute(query).fetchone()
+
+    if not row:
+        return dg.AssetCheckResult(
+            passed=False,
+            severity=dg.AssetCheckSeverity.ERROR,
+            metadata={"error": "Query returned no results"},
+        )
+
+    total, orphaned = row[0], row[1]
+    coverage_pct = round(100 * (total - orphaned) / total, 2) if total > 0 else 0.0
+
+    return dg.AssetCheckResult(
+        passed=orphaned == 0,
+        severity=dg.AssetCheckSeverity.WARN,
+        metadata={
+            "total_locations": total,
+            "orphaned_locations": orphaned,
+            "coverage_pct": coverage_pct,
+        },
+    )

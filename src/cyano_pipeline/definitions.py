@@ -7,6 +7,7 @@ from cyano_pipeline.defs import assets
 from cyano_pipeline.defs.resources import dlt_res, duckdb_res
 
 all_assets: Sequence[AssetLoaderTypes] = dg.load_assets_from_modules(modules=[assets])
+all_checks = dg.load_asset_checks_from_modules(modules=[assets])
 
 
 # === Jobs ===
@@ -53,7 +54,6 @@ mart_analytics_job = dg.define_asset_job(
     ),
 )
 
-
 # === Schedules ===
 
 
@@ -83,6 +83,7 @@ mart_analytics_schedule = dg.ScheduleDefinition(
 
 defs = dg.Definitions(
     assets=all_assets,
+    asset_checks=all_checks,
     resources={
         "dlt": dlt_res,
         "duckdb": duckdb_res,
