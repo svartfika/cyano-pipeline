@@ -12,25 +12,8 @@ def _():
 
 @app.cell
 def _():
-    import os
-    from pathlib import Path
-    import duckdb
-
-
-    def get_root(root_marker="pyproject.toml") -> Path:
-        return next(
-            p
-            for p in Path(__file__).resolve().parents
-            if (p / root_marker).exists()
-        )
-
-
-    DUCKDB_PATH: Path = Path(os.getenv("DUCKDB_PATH", "data/warehouse.duckdb"))
-
-    conn = duckdb.connect(
-        database=str(get_root() / DUCKDB_PATH),
-        read_only=True,
-    )
+    from duck import get_duckdb_conn
+    conn = get_duckdb_conn()
     return (conn,)
 
 
