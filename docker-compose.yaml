@@ -1,0 +1,15 @@
+services:
+  demo:
+    build:
+      context: .
+      dockerfile: Dockerfile.demo
+    ports:
+      - "3000:3000"  # Dagster
+      - "8080:8080"  # Marimo
+    volumes:
+      - ./data:/app/data
+      - data_home:/app/data_home
+    restart: unless-stopped
+
+volumes:
+  data_home:

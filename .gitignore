@@ -1,0 +1,89 @@
+
+# Python
+__pycache__/
+*.pyc
+*.pyd
+*.pyo
+*.so
+
+# Distribution / packaging
+.Python/
+build/
+develop-eggs/
+dist/
+eggs/
+*.egg-info/
+.installed.cfg
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+.coverage
+.tox/
+.nox/
+.pytest_cache/
+htmlcov/
+
+# Type checking
+.mypy_cache/
+.pyre/
+.pytype/
+typings/
+
+# Virtual environment
+env/
+venv/
+.venv/
+.venv/
+.uv/
+.cache/
+pip-cache/
+uv.lock
+
+# Editor directories and files
+.idea/
+*.code-workspace
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+.localized
+Thumbs.db
+Desktop.ini
+
+# Shared VSCode settings
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environment variables and secrets
+.env
+.flaskenv
+.settings.ini
+config.ini
+settings.py
+local_settings.py
+*.key
+*.pem
+*.pfx
+*.jks
+*.kdb
+*.csr
+*.crt
+*.cert
+*.secrets
+secrets.json
+
+# Data
+data/
+*.duckdb
+
+# Dagster
+.tmp_dagster_*

@@ -1,0 +1,92 @@
+# --- Builder ---
+
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS builder
+ENV UV_COMPILE_BYTECODE=1 
+ENV UV_LINK_MODE=copy 
+ENV UV_PYTHON_DOWNLOADS=0
+
+WORKDIR /app
+
+# 1. Install dependencies (Main + Dev + Marimo)
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --frozen --group dev --group marimo --no-install-project
+
+# 2. Copy Everything
+COPY . /app
+
+# 3. Install Project
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --group dev --group marimo
+
+
+# --- Runtime ---
+
+FROM python:3.13-slim-bookworm
+
+# 1. Install Tini & Setup User
+RUN apt-get update && apt-get install -y --no-install-recommends tini \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 999 demo \
+    && useradd --system --gid 999 --uid 999 --create-home demo
+
+WORKDIR /app
+
+# 2. Copy artifacts from builder
+COPY --from=builder --chown=demo:demo /app /app
+
+# 3. Configure Environment
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONPATH="/app/src" \
+    DAGSTER_HOME=/app/data_home \
+    DUCKDB_PATH=/app/data/warehouse.duckdb
+
+# 4. Ensure directories exist and are writable
+RUN mkdir -p /app/data /app/data_home \
+    && chown -R demo:demo /app/data /app/data_home
+
+
+# --- Entrypoint script ---
+
+COPY <<'EOF' /app/entrypoint.sh
+#!/bin/bash
+set -e
+
+# Start Dagster (Orchestration)
+if [ -f "workspace.yaml" ]; then
+    dagster dev -h 0.0.0.0 -p 3000 &
+else
+    dagster dev -h 0.0.0.0 -p 3000 -m cyano_pipeline &
+fi
+PID_DAGSTER=$!
+
+# Start Marimo (Notebook UI)
+marimo run src/notebooks/app.py --host 0.0.0.0 --port 8080 &
+PID_MARIMO=$!
+
+cleanup() {
+    kill $(jobs -p) 2>/dev/null
+    exit 0
+}
+
+# Trap SIGTERM/SIGINT and call cleanup
+trap cleanup EXIT
+
+# Wait for any process to exit. If one fails, the script exits.
+wait -n
+EOF
+
+RUN chmod +x /app/entrypoint.sh && chown demo:demo /app/entrypoint.sh
+
+
+# --- Start ---
+
+USER demo
+
+EXPOSE 3000 8080
+
+# Tini is the entrypoint (PID 1). 
+ENTRYPOINT ["/usr/bin/tini", "--"]
+
+CMD ["/app/entrypoint.sh"]
